@@ -112,7 +112,7 @@
         reader.readAsText(file);
     }
 
-    // Step 3: Map state modifications and trigger pipeline re-run
+    // Step 3: Map state modifications and  trigger pipeline re-run
     function triggerUpdate() {
         if (!cachedGeoJSON) return;
         
@@ -120,4 +120,4 @@
         document.getElementById('status').style.color = "#ff9800";
 
         // Collect UI elements
-        const minAadt = parseInt(document.getElementById('min-aadt').
+        const minAadt = parseInt(document.getElementById('min-aadt'). 
