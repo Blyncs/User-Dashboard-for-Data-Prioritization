@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HIDOT Asset Prioritization Tool</title>
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.26.0/full/pyodide.js"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; background-color: #f8f9fa; color: #333; display: flex; height: 100vh; }
+        
+        /* Layout mimics Streamlit Sidebar + Main Panel split */
+        .sidebar { width: 320px; background-color: #f0f2f6; padding: 20px; border-right: 1px solid #e6e9ef; box-sizing: border-box; overflow-y: auto; }
+        .main-content { flex: 1; padding: 30px; overflow-y: auto; box-sizing: border-box; }
+        
+        h1 { color: #0e1117; font-size: 24px; margin-top: 0; }
+        h2 { font-size: 18px; margin-top: 20px; color: #31333f; }
+        .info-box { background-color: #e8f4fd; border-left: 4px solid #2196f3; padding: 12px; border-radius: 4px; font-size: 14px; margin-top: 20px; }
+        .status-msg { font-size: 14px; font-weight: bold; margin-bottom: 20px; }
+        
+        label { font-weight: 500; display: block; margin-top: 15px; margin-bottom: 5px; font-size: 14px; }
+        input[type="file"], input[type="range"] { width: 100%; margin-bottom: 10px; }
+        .checkbox-group { margin-bottom: 15px; }
+        .checkbox-group label { display: inline-flex; align-items: center; font-weight: normal; margin: 0 10px 0 0; cursor: pointer; }
+        .checkbox-group input { margin-right: 5px; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; border-radius: 4px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        th, td { text-align: left; padding: 10px 15px; font-size: 14px; border-bottom: 1px solid #eaeaea; }
+        th { background-color: #f0f2f6; color: #31333f; font-weight: 600; }
+        
+        .badge-high { background: #fee2e2; color: #991b1b; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 12px; }
+        .badge-low { background: #dbeafe; color: #1e40af; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 12px; }
+        
+        .btn-download { background-color: white; border: 1px solid #d3d3d3; padding: 8px 16px; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; font-size: 14px; margin-top: 15px; }
+        .btn-download:hover { border-color: #a3a3a3; background-color: #fafafa; }
+    </style>
+</head>
+<body>
+
+<div class="sidebar">
+    <h3>📋 Agency Control Panel</h3>
+    <hr style="border: 0; border-top: 1px solid #dcdcdc; margin: 15px 0;">
+    
+    <label>Upload Blyncsy GeoJSON</label>
+    <input type="file" id="geojson-file" accept=".geojson,.json" disabled onchange="handleFileLoad()">
+
+    <label>Select Damage Severities to Target:</label>
+    <div class="checkbox-group">
+        <label><input type="checkbox" id="sev-high" checked onchange="triggerUpdate()"> High-Medium</label>
+        <label><input type="checkbox" id="sev-low" checked onchange="triggerUpdate()"> Low</label>
+    </div>
+
+    <label>Minimum AADT (Traffic Volume): <span id="aadt-val">1000</span></label>
+    <input type="range" id="min-aadt" min="500" max="10000" value="1000" step="500" oninput="updateAadtLabel(this.value)" onchange="triggerUpdate()">
+
+    <div class="info-box">
+        <strong>Prioritization Formula:</strong><br>
+        Priority Score = (Severity Weight × 0.7) + ((AADT / 1000) × 0.3)
+    </div>
+</div>
+
+<div class="main-content">
+    <h1>🛣️ HIDOT & Blyncsy Maintenance Prioritization Dashboard</h1>
+    <p style="color: #555; margin-top: -5px;">Upload roadway detection layers and apply agency constraints to find high-priority repairs.</p>
+    
+    <div id="status" class="status-msg" style="color: #ff9800;">💡 Loading environment engine into memory cache... please wait.</div>
+
+    <div id="dashboard-view" style="display: none;">
+        <h2>📊 Top Actionable Operations Manifest</h2>
+        <div id="table-placeholder"></div>
+        <button class="btn-download" onclick="downloadCSV()">📥 Export prioritized queue to CSV / Excel</button>
+    </div>
+</div>
+
+<script>
+    let pyodideInstance;
+    let cachedGeoJSON = null;
+    let calculatedCSVData = "";
+
+    // Step 1: Bootstrap Pyodide environment directly on load
+    async function initPython() {
+        try {
+            pyodideInstance = await loadPyodide();
+            await pyodideInstance.loadPackage(["pandas"]);
+            
+            document.getElementById('status').innerText = "💡 Please upload your `hidot_guardrail_...combined.geojson` file in the sidebar to begin processing.";
+            document.getElementById('status').style.color = "#2196f3";
+            document.getElementById('geojson-file').disabled = false;
+        } catch (err) {
+            document.getElementById('status').innerText = "❌ Infrastructure configuration error engine failure.";
+            console.error(err);
+        }
+    }
+    initPython();
+
+    function updateAadtLabel(val) {
+        document.getElementById('aadt-val').innerText = val;
+    }
+
+    // Step 2: Handle file inputs
+    function handleFileLoad() {
+        const file = document.getElementById('geojson-file').files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            cachedGeoJSON = e.target.result;
+            triggerUpdate();
+        };
+        reader.readAsText(file);
+    }
+
+    // Step 3: Map state modifications and trigger pipeline re-run
+    function triggerUpdate() {
+        if (!cachedGeoJSON) return;
+        
+        document.getElementById('status').innerText = "⚡ Processing operations telemetry matrix...";
+        document.getElementById('status').style.color = "#ff9800";
+
+        // Collect UI elements
+        const minAadt = parseInt(document.getElementById('min-aadt').value);
+        const targetSeverities = [];
+        if (document.getElementById('sev-high').checked) targetSeverities.push("High-Medium");
+        if (document.getElementById('sev-low').checked) targetSeverities.push("Low");
+
+        // Pass JavaScript memory items directly into WebAssembly Python stack
+        pyodideInstance.globals.set("raw_geojson", cachedGeoJSON);
+        pyodideInstance.globals.set("min_aadt_filter", minAadt);
+        pyodideInstance.globals.set("target_severities", pyodideInstance.toPy(targetSeverities));
+
+        // Exact match of your core calculation loop translated into Pyodide execution string
+        const pythonScript = `
+import json
+import pandas as pd
+
+geojson_data = json.loads(raw_geojson)
+features = geojson_data.get("features", [])
+
+processed_records = []
+for idx, feature in enumerate(features):
+    props = feature.get("properties", {})
+    coords = feature.get("geometry", {}).get("coordinates", [0, 0])
+    
+    raw_labels = props.get("labels", "unknown")
+    damage_list = [label.strip() for label in raw_labels.split(",")]
+    
+    if any("high" in d for d in damage_list) or any("medium" in d for d in damage_list):
+        severity = "High-Medium"
+    else:
+        severity = "Low"
+        
+    index_num = props.get("index", idx)
+    if index_num % 3 == 0:
+        aadt = 5000
+    elif index_num % 2 == 0:
+        aadt = 2000
+    else:
+        aadt = 1000
+        
+    processed_records.append({
+        "Priority Score": 0.0, # Placeholder calculated downstream
+        "Blyncsy Index": index_num,
+        "Severity": severity,
+        "AADT": aadt,
+        "Detections": raw_labels,
+        "Timestamp": props.get("localTime"),
+        "Longitude": coords[0],
+        "Latitude": coords[1],
+        "Image Link": props.get("img_link")
+    })
+
+df = pd.DataFrame(processed_records)
+
+# Apply runtime filters selected by user inside HTML panel layout
+df = df[df["Severity"].isin(target_severities)]
+df = df[df["AADT"] >= min_aadt_filter]
+
+if not df.empty:
+    severity_weights = {"High-Medium": 5.0, "Low": 1.5}
+    df["Priority Score"] = df.apply(
+        lambda row: round((severity_weights.get(row["Severity"], 1.0) * 0.7) + ((row["AADT"] / 1000) * 0.3), 2), 
+        axis=1
+    )
+    df = df.sort_values(by="Priority Score", ascending=False).reset_index(drop=True)
+
+# Generate payloads for display matrix and CSV generator outputs
+table_json = df[["Priority Score", "Blyncsy Index", "Severity", "AADT", "Detections", "Image Link"]].to_json(orient="records")
+csv_output = df.to_csv(index=False)
+json.dumps({"table": table_json, "csv": csv_output})
+`;
+
+        try {
+            const resultsStr = pyodideInstance.runPython(pythonScript);
+            const results = JSON.parse(JSON.parse(resultsStr));
+            
+            calculatedCSVData = results.csv;
+            renderHTMLTable(JSON.parse(results.table));
+            
+            document.getElementById('status').innerText = "";
+            document.getElementById('dashboard-view').style.display = "block";
+        } catch (err) {
+            document.getElementById('status').innerText = "⚠️ Error execution warning during file compile parsing.";
+            console.error(err);
+        }
+    }
+
+    // Step 4: Render view
+    function renderHTMLTable(records) {
+        if (!records || records.length === 0) {
+            document.getElementById('table-placeholder').innerHTML = "<div style='padding:20px; color:#666;'>No data matches your active filter criteria.</div>";
+            return;
+        }
+
+        let html = `<table>
+            <thead>
+                <tr>
+                    <th>Priority Score</th>
+                    <th>Blyncsy Index</th>
+                    <th>Severity</th>
+                    <th>AADT</th>
+                    <th>Detections</th>
+                    <th>Asset Link</th>
+                </tr>
+            </thead>
+            <tbody>`;
+
+        records.forEach(row => {
+            const badge = row["Severity"] === "High-Medium" ? "badge-high" : "badge-low";
+            html += `<tr>
+                <td><strong>${row["Priority Score"].toFixed(2)}</strong></td>
+                <td>${row["Blyncsy Index"]}</td>
+                <td><span class="${badge}">${row["Severity"]}</span></td>
+                <td>${row["AADT"].toLocaleString()}</td>
+                <td>${row["Detections"]}</td>
+                <td><a href="${row["Image Link"]}" target="_blank" style="color:#2196f3; text-decoration:none;">🔗 View Photo</a></td>
+            </tr>`;
+        });
+
+        html += `</tbody></table>`;
+        document.getElementById('table-placeholder').innerHTML = html;
+    }
+
+    // Direct export loop mapping back seamlessly to st.download_button parameters
+    function downloadCSV() {
+        if (!calculatedCSVData) return;
+        const blob = new Blob([calculatedCSVData], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.setAttribute("download", "hidot_prioritized_maintenance.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+</script>
+
+</body>
+</html>
