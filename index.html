@@ -4,120 +4,812 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HIDOT Asset Prioritization Tool</title>
-    <script src="https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; background-color: #f8f9fa; color: #333; display: flex; height: 100vh; }
-        
-        /* Layout mimics Streamlit Sidebar + Main Panel split */
-        .sidebar { width: 320px; background-color: #f0f2f6; padding: 20px; border-right: 1px solid #e6e9ef; box-sizing: border-box; overflow-y: auto; }
-        .main-content { flex: 1; padding: 30px; overflow-y: auto; box-sizing: border-box; }
-        
-        h1 { color: #0e1117; font-size: 24px; margin-top: 0; }
-        h2 { font-size: 18px; margin-top: 20px; color: #31333f; }
-        .info-box { background-color: #e8f4fd; border-left: 4px solid #2196f3; padding: 12px; border-radius: 4px; font-size: 14px; margin-top: 20px; }
-        .status-msg { font-size: 14px; font-weight: bold; margin-bottom: 20px; }
-        
-        label { font-weight: 500; display: block; margin-top: 15px; margin-bottom: 5px; font-size: 14px; }
-        input[type="file"], input[type="range"] { width: 100%; margin-bottom: 10px; }
-        .checkbox-group { margin-bottom: 15px; }
-        .checkbox-group label { display: inline-flex; align-items: center; font-weight: normal; margin: 0 10px 0 0; cursor: pointer; }
-        .checkbox-group input { margin-right: 5px; }
-        
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; border-radius: 4px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-        th, td { text-align: left; padding: 10px 15px; font-size: 14px; border-bottom: 1px solid #eaeaea; }
-        th { background-color: #f0f2f6; color: #31333f; font-weight: 600; }
-        
-        .badge-high { background: #fee2e2; color: #991b1b; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 12px; }
-        .badge-low { background: #dbeafe; color: #1e40af; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 12px; }
-        
-        .btn-download { background-color: white; border: 1px solid #d3d3d3; padding: 8px 16px; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; font-size: 14px; margin-top: 15px; }
-        .btn-download:hover { border-color: #a3a3a3; background-color: #fafafa; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #f0f2f6;
+            color: #1a1a2e;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* ── Sidebar ─────────────────────────────────────────── */
+        .sidebar {
+            width: 340px;
+            min-width: 340px;
+            background: #ffffff;
+            border-right: 1px solid #e2e8f0;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+        .sidebar-header {
+            background: linear-gradient(135deg, #1e3a5f 0%, #2d6a9f 100%);
+            padding: 20px;
+            color: white;
+        }
+        .sidebar-header h3 { font-size: 16px; font-weight: 700; margin: 0; letter-spacing: 0.5px; }
+        .sidebar-header p  { font-size: 12px; opacity: 0.8; margin-top: 4px; }
+        .sidebar-body { padding: 16px; flex: 1; }
+        .input-section { margin-bottom: 20px; }
+        .section-title {
+            font-size: 11px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 1px; color: #64748b; margin-bottom: 12px;
+            padding-bottom: 6px; border-bottom: 2px solid #e2e8f0;
+        }
+        .input-group { margin-bottom: 12px; }
+        label { font-weight: 500; display: block; margin-bottom: 4px; font-size: 12px; color: #374151; }
+        input[type="number"] {
+            width: 100%; padding: 7px 10px; border: 1px solid #d1d5db;
+            border-radius: 6px; font-size: 13px; color: #1a1a2e;
+            background: #f9fafb; transition: border-color 0.2s;
+        }
+        input[type="number"]:focus { outline: none; border-color: #2d6a9f; background: white; }
+        .slider-row { display: flex; align-items: center; gap: 8px; }
+        input[type="range"] { flex: 1; accent-color: #2d6a9f; }
+        .slider-val { font-size: 12px; font-weight: 700; color: #2d6a9f; min-width: 36px; text-align: right; }
+
+        /* ── File upload area ────────────────────────────────── */
+        .file-upload-area {
+            border: 2px dashed #93c5fd; border-radius: 8px; padding: 16px;
+            text-align: center; background: #eff6ff; cursor: pointer; transition: all 0.2s;
+        }
+        .file-upload-area:hover { border-color: #2d6a9f; background: #dbeafe; }
+        .file-upload-area input[type="file"] { display: none; }
+        .file-upload-icon { font-size: 26px; display: block; margin-bottom: 4px; }
+        .file-upload-text { font-size: 12px; color: #1d4ed8; font-weight: 700; display: block; }
+        .file-upload-sub  { font-size: 11px; color: #64748b; margin-top: 3px; display: block; }
+
+        /* ── File info box (shown after upload) ──────────────── */
+        .file-info-box {
+            background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px;
+            padding: 12px; margin-top: 10px; display: none;
+        }
+        .file-info-box.visible { display: block; }
+        .file-info-name { font-weight: 700; font-size: 12px; color: #15803d; margin-bottom: 8px;
+                          display: flex; align-items: flex-start; gap: 5px; word-break: break-all; }
+        .file-info-row  { display: flex; justify-content: space-between; align-items: center;
+                          font-size: 11px; color: #374151; margin-bottom: 5px; }
+        .file-info-val  { font-weight: 700; color: #1e3a5f; text-align: right; }
+        .file-info-tag  { display: inline-block; background: #dcfce7; color: #166534;
+                          border-radius: 4px; padding: 2px 6px; font-size: 10px; font-weight: 700;
+                          margin: 2px 2px 0 0; }
+        .from-file-badge { display: inline-block; background: #dbeafe; color: #1d4ed8;
+                           border-radius: 4px; padding: 1px 5px; font-size: 10px; font-weight: 700;
+                           margin-left: 4px; vertical-align: middle; }
+
+        /* ── Input auto-filled from file ─────────────────────── */
+        .input-group label .auto-badge {
+            display: inline-block; background: #dcfce7; color: #166534;
+            border-radius: 4px; padding: 1px 5px; font-size: 10px; font-weight: 700;
+            margin-left: 5px; vertical-align: middle;
+        }
+        input.from-file {
+            border-color: #86efac !important;
+            background: #f0fdf4 !important;
+        }
+
+        /* ── Main content ────────────────────────────────────── */
+        .main-content { flex: 1; padding: 24px 30px; overflow-y: auto; min-width: 0; box-sizing: border-box; }
+        .page-header { margin-bottom: 16px; }
+        .page-header h1 { color: #1e3a5f; font-size: 22px; font-weight: 700; line-height: 1.2; }
+        .page-header p  { color: #64748b; font-size: 13px; margin-top: 6px; }
+
+        /* ── Derived Metric Cards ────────────────────────────── */
+        .metrics-grid {
+            display: grid; grid-template-columns: repeat(4, 1fr);
+            gap: 12px; margin-bottom: 20px;
+        }
+        .metric-card {
+            background: white; border-radius: 10px; padding: 14px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+        }
+        .metric-card.vmt   { border-left: 4px solid #3b82f6; }
+        .metric-card.vpeak { border-left: 4px solid #f59e0b; }
+        .metric-card.sf    { border-left: 4px solid #ef4444; }
+        .metric-card.gr    { border-left: 4px solid #10b981; }
+        .metric-label   { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #94a3b8; margin-bottom: 6px; }
+        .metric-value   { font-size: 20px; font-weight: 700; color: #1e3a5f; line-height: 1; }
+        .metric-unit    { font-size: 11px; color: #94a3b8; margin-top: 4px; }
+        .metric-formula { font-size: 10px; color: #64748b; margin-top: 6px; font-style: italic; display: none; }
+
+        /* ── Map section ─────────────────────────────────────── */
+        .map-section { margin-bottom: 24px; display: none; }
+        .map-section.visible { display: block; }
+        #map { height: 430px; border-radius: 12px; overflow: hidden;
+               box-shadow: 0 2px 8px rgba(0,0,0,0.14); }
+
+        /* Leaflet legend panel */
+        .map-legend {
+            background: white; border-radius: 8px; padding: 10px 14px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.18); font-size: 11px; line-height: 1.9;
+        }
+        .map-legend h4 { font-size: 11px; font-weight: 700; color: #1e3a5f; margin-bottom: 6px;
+                         text-transform: uppercase; letter-spacing: 0.5px; }
+        .legend-item { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+        .legend-dot  { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+
+        /* ── Section header / button ─────────────────────────── */
+        .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+        .section-header h2 { font-size: 18px; font-weight: 700; color: #1e3a5f; }
+        .btn-download {
+            background: #1e3a5f; color: white; border: none; padding: 8px 16px;
+            border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500;
+            display: inline-flex; align-items: center; gap: 6px; transition: background 0.2s;
+        }
+        .btn-download:hover { background: #2d6a9f; }
+
+        /* ── Table ───────────────────────────────────────────── */
+        .table-wrapper { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+        table { width: 100%; border-collapse: collapse; }
+        thead tr { background: #1e3a5f; }
+        th {
+            text-align: left; padding: 12px 14px; font-size: 11px; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.6px; color: #cbd5e1; white-space: nowrap;
+        }
+        td { text-align: left; padding: 11px 14px; font-size: 13px; border-bottom: 1px solid #f1f5f9; color: #374151; }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: #f8fafc; }
+
+        .rank-badge {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 28px; height: 28px; border-radius: 50%;
+            font-weight: 700; font-size: 13px; color: white;
+        }
+        .rank-1  { background: #b91c1c; } .rank-2  { background: #c2410c; }
+        .rank-3  { background: #b45309; } .rank-4  { background: #a16207; }
+        .rank-5  { background: #4d7c0f; } .rank-6  { background: #15803d; }
+        .rank-7  { background: #0e7490; } .rank-8  { background: #1d4ed8; }
+        .rank-9  { background: #6d28d9; } .rank-10 { background: #7e22ce; }
+
+        .asset-name { font-weight: 600; color: #1e3a5f; }
+        .score-bar-container { display: flex; align-items: center; gap: 8px; }
+        .score-bar { flex: 1; height: 7px; background: #e2e8f0; border-radius: 4px; overflow: hidden; min-width: 70px; }
+        .score-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease; }
+        .score-text { font-size: 12px; font-weight: 700; min-width: 42px; text-align: right; }
+
+        .badge { padding: 3px 9px; border-radius: 12px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; }
+        .badge-critical { background: #fee2e2; color: #991b1b; }
+        .badge-high     { background: #fff7ed; color: #9a3412; }
+        .badge-medium   { background: #fefce8; color: #854d0e; }
+        .badge-low      { background: #f0fdf4; color: #166534; }
+
+        .formula-text {
+            font-family: 'Courier New', monospace; font-size: 11px;
+            color: #64748b; background: #f8fafc; padding: 2px 6px; border-radius: 4px;
+        }
+        .info-note {
+            background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px;
+            padding: 12px 16px; font-size: 12px; color: #1d4ed8;
+            margin-bottom: 18px; line-height: 1.5;
+        }
     </style>
 </head>
 <body>
 
+<!-- ═══════════════════════════════ SIDEBAR ═══════════════════════════════ -->
 <div class="sidebar">
-    <h3>📋 Agency Control Panel</h3>
-    <hr style="border: 0; border-top: 1px solid #dcdcdc; margin: 15px 0;">
-    
-    <label>Upload Blyncsy GeoJSON</label>
-    <input type="file" id="geojson-file" accept=".geojson,.json" disabled onchange="handleFileLoad()">
-
-    <label>Select Damage Severities to Target:</label>
-    <div class="checkbox-group">
-        <label><input type="checkbox" id="sev-high" checked onchange="triggerUpdate()"> High-Medium</label>
-        <label><input type="checkbox" id="sev-low" checked onchange="triggerUpdate()"> Low</label>
+    <div class="sidebar-header">
+        <h3>📋 Agency Control Panel</h3>
+        <p>Configure roadway parameters to generate priority scores</p>
     </div>
 
-    <label>Minimum AADT (Traffic Volume): <span id="aadt-val">1000</span></label>
-    <input type="range" id="min-aadt" min="500" max="10000" value="1000" step="500" oninput="updateAadtLabel(this.value)" onchange="triggerUpdate()">
+    <div class="sidebar-body">
 
-    <div class="info-box">
-        <strong>Prioritization Formula:</strong><br>
-        Priority Score = (Severity Weight × 0.7) + ((AADT / 1000) × 0.3)
+        <!-- 📁 Blyncsy GeoJSON Upload — PASER & Retro come from here -->
+        <div class="input-section">
+            <div class="section-title">📁 Blyncsy GeoJSON File</div>
+            <div class="file-upload-area" onclick="document.getElementById('geojson-file').click()">
+                <span class="file-upload-icon">🗺️</span>
+                <span class="file-upload-text">Click to Upload GeoJSON</span>
+                <span class="file-upload-sub">PASER &amp; Retroreflectivity read from file</span>
+                <input type="file" id="geojson-file" accept=".geojson,.json" onchange="handleFileLoad()">
+            </div>
+            <div class="file-info-box" id="file-info-box">
+                <div class="file-info-name">✅ <span id="file-name-display">—</span></div>
+                <div class="file-info-row">
+                    <span>Features loaded</span>
+                    <span class="file-info-val" id="fi-features">—</span>
+                </div>
+                <div class="file-info-row">
+                    <span>Avg PASER Rating</span>
+                    <span class="file-info-val" id="fi-paser">—</span>
+                </div>
+                <div class="file-info-row">
+                    <span>Avg Retroreflectivity</span>
+                    <span class="file-info-val" id="fi-retro">—</span>
+                </div>
+                <div style="margin-top:8px;font-size:11px;color:#64748b;font-weight:600;">Detected Asset Types:</div>
+                <div id="fi-asset-tags" style="margin-top:4px;"></div>
+                <div id="fi-unmatched-warn" style="display:none;margin-top:8px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;padding:8px;font-size:11px;color:#9a3412;">
+                    ⚠️ <strong id="fi-unmatched-count">0</strong> features have no matching detection type — showing as green (Rank 5 default).<br>
+                    <span style="color:#64748b;margin-top:4px;display:block;">Property keys found in your file:</span>
+                    <div id="fi-prop-keys" style="margin-top:4px;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 1. Traffic Volume -->
+        <div class="input-section">
+            <div class="section-title">📊 Traffic Volume</div>
+            <div class="input-group">
+                <label>AADT — Annual Avg Daily Traffic <span id="badge-aadt"></span></label>
+                <input type="number" id="aadt" value="15000" min="0" oninput="calculate()">
+            </div>
+            <div class="input-group">
+                <label>AADTT — Annual Avg Daily Truck Traffic <span id="badge-aadtt"></span></label>
+                <input type="number" id="aadtt" value="1500" min="0" oninput="calculate()">
+            </div>
+            <div class="input-group">
+                <label>Segment Length (miles) <span id="badge-seg-len"></span></label>
+                <input type="number" id="seg-len" value="2.5" min="0.1" step="0.1" oninput="calculate()">
+            </div>
+        </div>
+
+        <!-- 2. Peak Hour Directional Volume -->
+        <div class="input-section">
+            <div class="section-title">⏱ Peak Hour Directional Volume</div>
+            <div class="input-group">
+                <label>K Factor — Peak Hour Fraction <span id="badge-k-factor"></span></label>
+                <div class="slider-row">
+                    <input type="range" id="k-factor" min="0.05" max="0.15" value="0.10" step="0.01"
+                           oninput="updateSlider('k-factor','k-val',2); calculate()">
+                    <span class="slider-val" id="k-val">0.10</span>
+                </div>
+            </div>
+            <div class="input-group">
+                <label>D Factor — Directional Distribution <span id="badge-d-factor"></span></label>
+                <div class="slider-row">
+                    <input type="range" id="d-factor" min="0.50" max="0.70" value="0.55" step="0.01"
+                           oninput="updateSlider('d-factor','d-val',2); calculate()">
+                    <span class="slider-val" id="d-val">0.55</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. Heavy Vehicle / Stress Factor -->
+        <div class="input-section">
+            <div class="section-title">🚛 Heavy Vehicle / Stress Factor</div>
+            <div class="input-group">
+                <label>Speed Limit (mph) <span id="badge-speed-limit"></span></label>
+                <input type="number" id="speed-limit" value="65" min="0" max="120" oninput="calculate()">
+            </div>
+            <div class="input-group">
+                <label>Pavement Age (years) <span id="badge-pavement-age"></span></label>
+                <input type="number" id="pavement-age" value="10" min="0" oninput="calculate()">
+            </div>
+        </div>
+
+        <!-- 4. Geometry Risk Factor -->
+        <div class="input-section">
+            <div class="section-title">📐 Geometry Risk Factor</div>
+            <div class="input-group">
+                <label>Turning Radius (ft) <span id="badge-turning-radius"></span></label>
+                <input type="number" id="turning-radius" value="500" min="1" oninput="calculate()">
+            </div>
+        </div>
+
     </div>
 </div>
 
+<!-- ══════════════════════════ MAIN CONTENT ══════════════════════════════ -->
 <div class="main-content">
-    <h1>🛣️ HIDOT & Blyncsy Maintenance Prioritization Dashboard</h1>
-    <p style="color: #555; margin-top: -5px;">Upload roadway detection layers and apply agency constraints to find high-priority repairs.</p>
-    
-    <div id="status" class="status-msg" style="color: #ff9800;">💡 Loading environment engine into memory cache... please wait.</div>
+    <div class="page-header">
+        <h1>🛣️ HIDOT &amp; Blyncsy Maintenance Prioritization Dashboard</h1>
+        <p>Input roadway parameters and upload a Blyncsy GeoJSON to generate a ranked asset priority matrix and interactive map.</p>
+    </div>
 
-    <div id="dashboard-view" style="display: none;">
-        <h2>📊 Top Actionable Operations Manifest</h2>
-        <div id="table-placeholder"></div>
-        <button class="btn-download" onclick="downloadCSV()">📥 Export prioritized queue to CSV / Excel</button>
+    <div class="info-note">
+        ℹ️ Priority scores are <strong>normalized (0–100)</strong> relative to the highest-scoring asset.
+        <strong>PASER Rating</strong> and <strong>Retroreflectivity Score</strong> are extracted automatically from the uploaded GeoJSON file (defaults used until a file is loaded).
+        Upload a file to activate the map view with color-coded asset locations.
+    </div>
+
+    <!-- Derived Metric Cards -->
+    <div class="metrics-grid">
+        <div class="metric-card vmt">
+            <div class="metric-label">Total Segment Exposure</div>
+            <div class="metric-value" id="metric-vmt">—</div>
+            <div class="metric-unit">VMT (vehicle-miles)</div>
+            <div class="metric-formula">= Segment Length × AADT</div>
+        </div>
+        <div class="metric-card vpeak">
+            <div class="metric-label">Peak Hour Dir. Volume</div>
+            <div class="metric-value" id="metric-vpeak">—</div>
+            <div class="metric-unit">vehicles / hr / direction</div>
+            <div class="metric-formula">= AADT × K × D</div>
+        </div>
+        <div class="metric-card sf">
+            <div class="metric-label">Heavy Vehicle Stress Factor</div>
+            <div class="metric-value" id="metric-sf">—</div>
+            <div class="metric-unit">stress index</div>
+            <div class="metric-formula">= (AADTT / AADT) × Speed</div>
+        </div>
+        <div class="metric-card gr">
+            <div class="metric-label">Geometry Risk Factor</div>
+            <div class="metric-value" id="metric-gr">—</div>
+            <div class="metric-unit">risk ratio</div>
+            <div class="metric-formula">= Speed Limit / Turning Radius</div>
+        </div>
+    </div>
+
+    <!-- Map Section — hidden until GeoJSON is uploaded -->
+    <div class="map-section" id="map-section">
+        <div class="section-header">
+            <h2>🗺️ Asset Priority Map</h2>
+            <span style="font-size:12px;color:#64748b;">Features color-coded by priority rank (1–10) — click any feature for details</span>
+        </div>
+        <div id="map"></div>
+    </div>
+
+    <!-- Priority Table -->
+    <div class="section-header">
+        <h2>📊 Asset Prioritization Ranking (1–10)</h2>
+        <button class="btn-download" onclick="downloadCSV()">📥 Export to CSV</button>
+    </div>
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Rank</th>
+                    <th>Asset / Detection Type</th>
+                    <th>Primary Risk Driver</th>
+                    <th>Priority Score</th>
+                    <th>Urgency</th>
+                </tr>
+            </thead>
+            <tbody id="table-body"></tbody>
+        </table>
     </div>
 </div>
 
 <script>
-    let pyodideInstance;
-    let cachedGeoJSON = null;
-    let calculatedCSVData = "";
+    let currentAssets = [];
+    let geoData       = null;
+    let leafletMap    = null;
+    let geoLayer      = null;
+    let legendControl = null;
 
-    // Step 1: Bootstrap Pyodide environment directly on load using robust index parameters
-    async function initPython() {
-        try {
-            pyodideInstance = await loadPyodide({
-                indexURL: "https://cdn.jsdelivr.net/pyodide/v0.25.0/full/"
-            });
-            await pyodideInstance.loadPackage(["pandas"]);
-            
-            document.getElementById('status').innerText = "💡 Python Engine Ready. Please upload your Blyncsy GeoJSON file to begin processing.";
-            document.getElementById('status').style.color = "#2196f3";
-            document.getElementById('geojson-file').disabled = false;
-        } catch (err) {
-            document.getElementById('status').innerText = "❌ Script initialization failed. Try performing a hard refresh (Shift + Refresh).";
-            document.getElementById('status').style.color = "#ef5350";
-            console.error(err);
-        }
+    // Values extracted from the uploaded file (defaults until file loaded)
+    let filePaser = 5;
+    let fileRetro = 150;
+
+    /* ── Rank color + name lookups (match CSS) ────────────────────────── */
+    const RANK_COLORS = {
+        1:'#b91c1c', 2:'#c2410c', 3:'#b45309', 4:'#a16207',
+        5:'#4d7c0f', 6:'#15803d', 7:'#0e7490', 8:'#1d4ed8',
+        9:'#6d28d9', 10:'#7e22ce'
+    };
+    const RANK_NAMES = {
+        1:'End Treatments & Guardrails', 2:'Cable Barriers',
+        3:'Concrete Barriers',           4:'Potholes',
+        5:'Paintline Visibility',         6:'Signs',
+        7:'PASER / Pavement',            8:'Cracking',
+        9:'Vegetation Encroachment',     10:'MOT'
+    };
+
+    /* ── Map detection type → rank ────────────────────────────────────── */
+    function detectionToRank(val) {
+        if (!val) return null;
+        const d = String(val).toLowerCase().replace(/[_\-]/g, ' ');
+        if (d.includes('guardrail') || d.includes('end treatment') || d.includes('terminal')) return 1;
+        if (d.includes('cable'))     return 2;
+        if (d.includes('concrete') || (d.includes('barrier') && !d.includes('cable'))) return 3;
+        if (d.includes('pothole'))   return 4;
+        if (d.includes('paint') || d.includes('marking') || d.includes('line') || d.includes('retro')) return 5;
+        if (d.includes('sign'))      return 6;
+        if (d.includes('paser') || (d.includes('pavement') && !d.includes('marking') && !d.includes('age'))) return 7;
+        if (d.includes('crack') || d.includes('alligator') || d.includes('longitudinal')) return 8;
+        if (d.includes('veget') || d.includes('mow') || d.includes('tree') || d.includes('brush')) return 9;
+        if (d.includes('mot') || d.includes('work zone') || d.includes('traffic control')) return 10;
+        return null;
     }
-    initPython();
 
-    function updateAadtLabel(val) {
-        document.getElementById('aadt-val').innerText = val;
+    /* ── Helpers ──────────────────────────────────────────────────────── */
+    function updateSlider(id, labelId, decimals) {
+        document.getElementById(labelId).innerText =
+            parseFloat(document.getElementById(id).value).toFixed(decimals);
     }
 
-    // Step 2: Handle file inputs
+    function fmt(n) {
+        if (!isFinite(n) || isNaN(n)) return '—';
+        if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+        if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+        return n.toFixed(2);
+    }
+
+    /* ── Core Calculation ─────────────────────────────────────────────── */
+    function calculate() {
+        const aadt   = parseFloat(document.getElementById('aadt').value)          || 0;
+        const aadtt  = parseFloat(document.getElementById('aadtt').value)         || 0;
+        const segLen = parseFloat(document.getElementById('seg-len').value)        || 0;
+        const k      = parseFloat(document.getElementById('k-factor').value)       || 0.10;
+        const d      = parseFloat(document.getElementById('d-factor').value)       || 0.55;
+        const speed  = parseFloat(document.getElementById('speed-limit').value)    || 0;
+        const radius = parseFloat(document.getElementById('turning-radius').value) || 1;
+        const age    = parseFloat(document.getElementById('pavement-age').value)   || 0;
+
+        // PASER & Retro come from the uploaded file, not from sidebar inputs
+        const paser = filePaser;
+        const retro = fileRetro;
+
+        /* 4 Derived Traffic Metrics */
+        const vmt   = segLen * aadt;
+        const vpeak = aadt * k * d;
+        const sf    = aadt > 0 ? (aadtt / aadt) * speed : 0;
+        const gr    = radius > 0 ? speed / radius : 0;
+
+        document.getElementById('metric-vmt').innerText   = fmt(vmt);
+        document.getElementById('metric-vpeak').innerText = fmt(vpeak);
+        document.getElementById('metric-sf').innerText    = fmt(sf);
+        document.getElementById('metric-gr').innerText    = gr.toFixed(4);
+
+        /* 10 Asset Priority Scores */
+        const assets = [
+            { rank:1,  name:"End Treatments &amp; Guardrails", risk:"Impact Lethality",             formula:"VMT × GR × Speed",          score: vmt * gr * speed },
+            { rank:2,  name:"Cable Barriers",                   risk:"Head-on Crossovers",           formula:"AADT × Speed × (1 − D)",    score: aadt * speed * (1 - d) },
+            { rank:3,  name:"Concrete Barriers",                risk:"Mass Displacement",            formula:"AADTT × Speed",              score: aadtt * speed },
+            { rank:4,  name:"Potholes",                         risk:"Immediate Vehicle Damage",     formula:"V_peak × AADTT",             score: vpeak * aadtt },
+            { rank:5,  name:"Paintline Visibility",             risk:"Lane Departure",               formula:"VMT / Retroreflectivity",    score: retro > 0 ? vmt / retro : 0 },
+            { rank:6,  name:"Signs (Regulatory &amp; Warning)", risk:"Driver Disorientation",        formula:"AADT × GR × Speed",          score: aadt * gr * speed },
+            { rank:7,  name:"PASER (Pavement Rating)",          risk:"Long-Term Asset Devaluation",  formula:"(VMT × AADTT) / PASER",      score: paser > 0 ? (vmt * aadtt) / paser : 0 },
+            { rank:8,  name:"Cracking",                         risk:"Water Infiltration / Subbase", formula:"AADTT × Pavement Age",       score: aadtt * age },
+            { rank:9,  name:"Vegetation Encroachment",          risk:"Sight Distance Obstruction",   formula:"AADT × GR",                  score: aadt * gr },
+            { rank:10, name:"MOT (Maintenance of Traffic)",     risk:"Work Zone Safety &amp; Congestion", formula:"V_peak × Speed",        score: vpeak * speed }
+        ];
+
+        const maxScore = Math.max(...assets.map(a => a.score), 1);
+        assets.forEach(a => { a.normalized = (a.score / maxScore) * 100; });
+
+        currentAssets = assets;
+        renderTable(assets);
+
+        // Re-render map popups if file already loaded
+        if (geoData) renderMap(geoData);
+    }
+
+    /* ── Urgency helpers ──────────────────────────────────────────────── */
+    function urgency(n) {
+        if (n >= 75) return { label:'Critical', cls:'badge-critical' };
+        if (n >= 50) return { label:'High',     cls:'badge-high'     };
+        if (n >= 25) return { label:'Medium',   cls:'badge-medium'   };
+        return              { label:'Low',       cls:'badge-low'      };
+    }
+
+    function barColor(n) {
+        if (n >= 75) return '#dc2626';
+        if (n >= 50) return '#f97316';
+        if (n >= 25) return '#eab308';
+        return '#22c55e';
+    }
+
+    /* ── Render Table ─────────────────────────────────────────────────── */
+    function renderTable(assets) {
+        const tbody = document.getElementById('table-body');
+        tbody.innerHTML = '';
+        assets.forEach(a => {
+            const u = urgency(a.normalized);
+            const c = barColor(a.normalized);
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><span class="rank-badge rank-${a.rank}">${a.rank}</span></td>
+                <td><span class="asset-name">${a.name}</span></td>
+                <td style="color:#64748b;font-size:12px;">${a.risk}</td>
+                <td>
+                    <div class="score-bar-container">
+                        <div class="score-bar">
+                            <div class="score-fill" style="width:${a.normalized.toFixed(1)}%;background:${c};"></div>
+                        </div>
+                        <span class="score-text" style="color:${c};">${a.normalized.toFixed(1)}</span>
+                    </div>
+                </td>
+                <td><span class="badge ${u.cls}">${u.label}</span></td>`;
+            tbody.appendChild(tr);
+        });
+    }
+
+    /* ── GeoJSON Upload ───────────────────────────────────────────────── */
     function handleFileLoad() {
         const file = document.getElementById('geojson-file').files[0];
         if (!file) return;
 
         const reader = new FileReader();
         reader.onload = function(e) {
-            cachedGeoJSON = e.target.result;
-            triggerUpdate();
+            try {
+                const geo = JSON.parse(e.target.result);
+                geoData = geo;
+
+                /* ── Accumulate all numeric fields across every feature ── */
+                const acc = {
+                    aadt:           [], aadtt:    [], seg_len:  [],
+                    k_factor:       [], d_factor: [], speed:    [],
+                    pavement_age:   [], radius:   [],
+                    paser:          [], retro:    []
+                };
+                const assetTypes = new Set();
+
+                (geo.features || []).forEach(f => {
+                    const p = f.properties || {};
+
+                    const grab = (keys) => {
+                        for (const k of keys) {
+                            if (p[k] != null && !isNaN(parseFloat(p[k])))
+                                return parseFloat(p[k]);
+                        }
+                        return null;
+                    };
+
+                    const push = (bucket, keys) => {
+                        const v = grab(keys);
+                        if (v !== null) bucket.push(v);
+                    };
+
+                    push(acc.aadt,         ['aadt','AADT','avg_aadt','AVG_AADT']);
+                    push(acc.aadtt,        ['aadtt','AADTT','truck_aadt','TRUCK_AADT']);
+                    push(acc.seg_len,      ['length','LENGTH','seg_len','SEG_LEN','segment_length','miles']);
+                    push(acc.k_factor,     ['k_factor','K_FACTOR','k','K','peak_hour_factor']);
+                    push(acc.d_factor,     ['d_factor','D_FACTOR','d','D','directional_factor']);
+                    push(acc.speed,        ['speed','SPEED','speed_limit','SPEED_LIMIT','posted_speed']);
+                    push(acc.pavement_age, ['age','AGE','pave_age','PAVE_AGE','pavement_age','PAVEMENT_AGE']);
+                    push(acc.radius,       ['radius','RADIUS','turning_radius','TURNING_RADIUS','curve_radius']);
+                    push(acc.paser,        ['paser','PASER','paser_rating','PASER_RATING']);
+                    push(acc.retro,        ['retro','RETRO','retroreflectivity','RETROREFLECTIVITY','retro_score']);
+
+                    const dt = p.detection_type ?? p.DetectionType ?? p.asset_type
+                             ?? p.damage_type   ?? p.type          ?? p.TYPE;
+                    if (dt) assetTypes.add(String(dt));
+                });
+
+                // Collect all unique property keys from the first 5 features for debugging
+                const allPropKeys = new Set();
+                (geo.features || []).slice(0, 5).forEach(f => {
+                    Object.keys(f.properties || {}).forEach(k => allPropKeys.add(k));
+                });
+
+                // Count how many features have no matching detection type
+                let unmatchedCount = 0;
+                (geo.features || []).forEach(f => {
+                    const p = f.properties || {};
+                    const dt = p.detection_type ?? p.DetectionType ?? p.asset_type
+                             ?? p.damage_type   ?? p.type          ?? p.TYPE;
+                    if (!dt || detectionToRank(dt) === null) unmatchedCount++;
+                });
+
+                /* ── Helper: average an array ──────────────────────────── */
+                const avg = (arr) => arr.length
+                    ? arr.reduce((a, b) => a + b, 0) / arr.length
+                    : null;
+
+                /* ── Auto-populate sidebar number inputs ───────────────── */
+                const setInput = (id, badgeId, values, decimals = 0) => {
+                    const val = avg(values);
+                    const el  = document.getElementById(id);
+                    const badge = document.getElementById(badgeId);
+                    if (val !== null) {
+                        el.value = parseFloat(val.toFixed(decimals));
+                        el.classList.add('from-file');
+                        badge.innerHTML = '<span class="auto-badge">↑ from file</span>';
+                    } else {
+                        el.classList.remove('from-file');
+                        badge.innerHTML = '';
+                    }
+                };
+
+                /* ── Auto-populate sidebar range sliders ───────────────── */
+                const setSlider = (id, labelId, badgeId, values, decimals = 2) => {
+                    const val = avg(values);
+                    const el  = document.getElementById(id);
+                    const badge = document.getElementById(badgeId);
+                    if (val !== null) {
+                        // Clamp to slider min/max
+                        const clamped = Math.min(Math.max(val, parseFloat(el.min)), parseFloat(el.max));
+                        el.value = clamped.toFixed(decimals);
+                        document.getElementById(labelId).innerText = clamped.toFixed(decimals);
+                        badge.innerHTML = '<span class="auto-badge">↑ from file</span>';
+                    } else {
+                        badge.innerHTML = '';
+                    }
+                };
+
+                setInput('aadt',          'badge-aadt',          acc.aadt,         0);
+                setInput('aadtt',         'badge-aadtt',         acc.aadtt,        0);
+                setInput('seg-len',       'badge-seg-len',       acc.seg_len,      2);
+                setInput('speed-limit',   'badge-speed-limit',   acc.speed,        0);
+                setInput('pavement-age',  'badge-pavement-age',  acc.pavement_age, 1);
+                setInput('turning-radius','badge-turning-radius', acc.radius,      0);
+                setSlider('k-factor', 'k-val', 'badge-k-factor', acc.k_factor, 2);
+                setSlider('d-factor', 'd-val', 'badge-d-factor', acc.d_factor, 2);
+
+                /* ── PASER & Retro (file-only values) ──────────────────── */
+                filePaser = avg(acc.paser) !== null
+                    ? +avg(acc.paser).toFixed(1) : 5;
+                fileRetro = avg(acc.retro) !== null
+                    ? Math.round(avg(acc.retro)) : 150;
+
+                /* ── Populate file info box ─────────────────────────────── */
+                document.getElementById('file-name-display').innerText = file.name;
+                document.getElementById('fi-features').innerText = (geo.features || []).length;
+
+                document.getElementById('fi-paser').innerHTML = acc.paser.length
+                    ? `${filePaser} <span class="from-file-badge">from file</span>`
+                    : `5.0 <span class="from-file-badge">default</span>`;
+
+                document.getElementById('fi-retro').innerHTML = acc.retro.length
+                    ? `${fileRetro} mcd <span class="from-file-badge">from file</span>`
+                    : `150 mcd <span class="from-file-badge">default</span>`;
+
+                const tagsEl = document.getElementById('fi-asset-tags');
+                tagsEl.innerHTML = '';
+                if (assetTypes.size) {
+                    assetTypes.forEach(t => {
+                        const s = document.createElement('span');
+                        s.className = 'file-info-tag';
+                        s.innerText = t;
+                        tagsEl.appendChild(s);
+                    });
+                } else {
+                    tagsEl.innerHTML = '<span style="font-size:11px;color:#94a3b8;font-style:italic;">No type tags detected</span>';
+                }
+
+                // Show unmatched warning with property key list
+                const warnEl = document.getElementById('fi-unmatched-warn');
+                if (unmatchedCount > 0) {
+                    document.getElementById('fi-unmatched-count').innerText = unmatchedCount;
+                    const keysEl = document.getElementById('fi-prop-keys');
+                    keysEl.innerHTML = '';
+                    allPropKeys.forEach(k => {
+                        const s = document.createElement('span');
+                        s.style.cssText = 'display:inline-block;background:#f1f5f9;color:#1e3a5f;border-radius:3px;padding:1px 5px;font-size:10px;font-weight:600;margin:2px 2px 0 0;font-family:monospace;';
+                        s.innerText = k;
+                        keysEl.appendChild(s);
+                    });
+                    warnEl.style.display = 'block';
+                } else {
+                    warnEl.style.display = 'none';
+                }
+
+                document.getElementById('file-info-box').classList.add('visible');
+                document.getElementById('map-section').classList.add('visible');
+                calculate();
+                renderMap(geo);
+
+            } catch(err) {
+                console.warn('GeoJSON parse error:', err);
+                alert('Could not parse the uploaded file. Please check it is valid GeoJSON.');
+            }
         };
         reader.readAsText(file);
     }
 
-    // Step 3: Map state modifications and  trigger pipeline re-run
-    function triggerUpdate() {
-        if (!cachedGeoJSON) return;
-        
-        document.getElementById('status').innerText = "⚡ Processing operations telemetry matrix...";
-        document.getElementById('status').style.color = "#ff9800";
+    /* ── Render Map ───────────────────────────────────────────────────── */
+    function renderMap(geo) {
+        // Initialise Leaflet map once
+        if (!leafletMap) {
+            leafletMap = L.map('map');
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+                maxZoom: 19
+            }).addTo(leafletMap);
 
-        // Collect UI elements
-        const minAadt = parseInt(document.getElementById('min-aadt') 
+            // Build legend control
+            legendControl = L.control({ position: 'topright' });
+            legendControl.onAdd = function() {
+                const div = L.DomUtil.create('div', 'map-legend');
+                let html = '<h4>Priority Rank</h4>';
+                for (let r = 1; r <= 10; r++) {
+                    html += `<div class="legend-item">
+                        <span class="legend-dot" style="background:${RANK_COLORS[r]};"></span>
+                        <span>${r}. ${RANK_NAMES[r]}</span>
+                    </div>`;
+                }
+                div.innerHTML = html;
+                return div;
+            };
+            legendControl.addTo(leafletMap);
+        }
+
+        // Remove previous GeoJSON layer
+        if (geoLayer) { leafletMap.removeLayer(geoLayer); geoLayer = null; }
+
+        // Add new GeoJSON layer
+        geoLayer = L.geoJSON(geo, {
+            /* Style lines / polygons */
+            style: function(feature) {
+                const p  = feature.properties || {};
+                const dt = p.detection_type ?? p.DetectionType ?? p.asset_type
+                         ?? p.damage_type   ?? p.type          ?? p.TYPE;
+                const rank  = detectionToRank(dt) || 5;
+                const color = RANK_COLORS[rank];
+                return { color, weight: 4, opacity: 0.9, fillColor: color, fillOpacity: 0.4 };
+            },
+            /* Style point features as circle markers */
+            pointToLayer: function(feature, latlng) {
+                const p  = feature.properties || {};
+                const dt = p.detection_type ?? p.DetectionType ?? p.asset_type
+                         ?? p.damage_type   ?? p.type          ?? p.TYPE;
+                const rank  = detectionToRank(dt) || 5;
+                const color = RANK_COLORS[rank];
+                return L.circleMarker(latlng, {
+                    radius: 9, fillColor: color,
+                    color: '#ffffff', weight: 2,
+                    opacity: 1, fillOpacity: 0.9
+                });
+            },
+            /* Attach popup to every feature */
+            onEachFeature: function(feature, layer) {
+                const p  = feature.properties || {};
+                const dt = p.detection_type ?? p.DetectionType ?? p.asset_type
+                         ?? p.damage_type   ?? p.type          ?? p.TYPE ?? 'Unknown';
+                const rank  = detectionToRank(dt) || 5;
+                const color = RANK_COLORS[rank];
+
+                const asset  = currentAssets.find(a => a.rank === rank);
+                const score  = asset ? asset.normalized.toFixed(1) : '—';
+                const urgLbl = asset ? urgency(asset.normalized).label : '—';
+
+                // Per-feature PASER / retro (fall back to file averages)
+                const featPaser = p.paser ?? p.PASER ?? filePaser;
+                const featRetro = p.retro ?? p.RETRO ?? p.retroreflectivity ?? fileRetro;
+
+                layer.bindPopup(`
+                    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;min-width:210px;">
+                        <div style="display:flex;align-items:center;gap:9px;margin-bottom:10px;">
+                            <span style="background:${color};color:#fff;border-radius:50%;width:30px;height:30px;
+                                  display:inline-flex;align-items:center;justify-content:center;
+                                  font-weight:700;font-size:15px;flex-shrink:0;">${rank}</span>
+                            <strong style="color:#1e3a5f;font-size:13px;">${RANK_NAMES[rank]}</strong>
+                        </div>
+                        <table style="width:100%;font-size:12px;border-collapse:collapse;">
+                            <tr><td style="color:#64748b;padding:3px 0;">Detection Type</td>
+                                <td style="font-weight:600;text-align:right;">${dt}</td></tr>
+                            <tr><td style="color:#64748b;padding:3px 0;">Priority Score</td>
+                                <td style="font-weight:700;color:${color};text-align:right;">${score} / 100</td></tr>
+                            <tr><td style="color:#64748b;padding:3px 0;">Urgency</td>
+                                <td style="font-weight:600;text-align:right;">${urgLbl}</td></tr>
+                            <tr><td style="color:#64748b;padding:3px 0;">PASER Rating</td>
+                                <td style="font-weight:600;text-align:right;">${parseFloat(featPaser).toFixed(1)}</td></tr>
+                            <tr><td style="color:#64748b;padding:3px 0;">Retroreflectivity</td>
+                                <td style="font-weight:600;text-align:right;">${Math.round(featRetro)} mcd</td></tr>
+                        </table>
+                    </div>`, { maxWidth: 280 });
+            }
+        }).addTo(leafletMap);
+
+        // Fit map to loaded features — defer so the container has rendered at full size
+        setTimeout(() => {
+            try {
+                leafletMap.invalidateSize();
+                const bounds = geoLayer.getBounds();
+                if (bounds.isValid()) leafletMap.fitBounds(bounds, { padding: [40, 40] });
+            } catch(e) { console.warn('fitBounds error:', e); }
+        }, 150);
+    }
+
+    /* ── CSV Export ───────────────────────────────────────────────────── */
+    function downloadCSV() {
+        if (!currentAssets.length) return;
+        const headers = ['Rank','Asset / Detection Type','Primary Risk Driver','Formula','Normalized Score (0-100)','Urgency'];
+        const rows = currentAssets.map(a => {
+            const u = urgency(a.normalized);
+            return [a.rank, `"${a.name.replace(/&amp;/g,'&')}"`, `"${a.risk}"`, `"${a.formula}"`,
+                    a.normalized.toFixed(2), u.label].join(',');
+        });
+        const csv  = [headers.join(','), ...rows].join('\n');
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url  = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url; link.download = 'HIDOT_Priority_Matrix.csv'; link.click();
+        URL.revokeObjectURL(url);
+    }
+
+    /* ── Init ─────────────────────────────────────────────────────────── */
+    calculate();
+</script>
+</body>
+</html>
+
+

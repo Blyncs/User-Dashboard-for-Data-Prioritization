@@ -1,0 +1,215 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-157.8583, 21.3069]
+      },
+      "properties": {
+        "detection_type": "pothole",
+        "severity": "high",
+        "paser": 3,
+        "retro": 85,
+        "aadt": 18000,
+        "aadtt": 1800,
+        "speed_limit": 45,
+        "length": 1.8,
+        "k_factor": 0.10,
+        "d_factor": 0.58,
+        "pavement_age": 12,
+        "turning_radius": 400,
+        "road_name": "Nimitz Hwy"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-157.8620, 21.3095]
+      },
+      "properties": {
+        "detection_type": "cracking",
+        "severity": "medium",
+        "paser": 4,
+        "retro": 110,
+        "aadt": 12000,
+        "speed_limit": 45,
+        "road_name": "Nimitz Hwy"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-157.8550, 21.3045]
+      },
+      "properties": {
+        "detection_type": "guardrail",
+        "severity": "high",
+        "paser": 5,
+        "retro": 140,
+        "aadt": 22000,
+        "speed_limit": 55,
+        "road_name": "H-1 Freeway"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [-157.8600, 21.3080],
+          [-157.8570, 21.3060],
+          [-157.8540, 21.3040]
+        ]
+      },
+      "properties": {
+        "detection_type": "paint marking",
+        "severity": "medium",
+        "paser": 6,
+        "retro": 65,
+        "aadt": 15000,
+        "speed_limit": 50,
+        "road_name": "Ala Moana Blvd"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [-157.8660, 21.3120],
+          [-157.8640, 21.3100],
+          [-157.8610, 21.3085]
+        ]
+      },
+      "properties": {
+        "detection_type": "cable barrier",
+        "severity": "high",
+        "paser": 5,
+        "retro": 130,
+        "aadt": 30000,
+        "speed_limit": 65,
+        "road_name": "H-1 Freeway West"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-157.8500, 21.3020]
+      },
+      "properties": {
+        "detection_type": "sign",
+        "severity": "low",
+        "paser": 7,
+        "retro": 200,
+        "aadt": 9000,
+        "speed_limit": 35,
+        "road_name": "King St"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-157.8480, 21.3000]
+      },
+      "properties": {
+        "detection_type": "vegetation",
+        "severity": "low",
+        "paser": 7,
+        "retro": 180,
+        "aadt": 7500,
+        "speed_limit": 30,
+        "road_name": "King St"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-157.8700, 21.3150]
+      },
+      "properties": {
+        "detection_type": "concrete barrier",
+        "severity": "high",
+        "paser": 4,
+        "retro": 120,
+        "aadt": 28000,
+        "speed_limit": 65,
+        "road_name": "H-1 Freeway East"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-157.8530, 21.3055]
+      },
+      "properties": {
+        "detection_type": "pothole",
+        "severity": "high",
+        "paser": 2,
+        "retro": 75,
+        "aadt": 14000,
+        "speed_limit": 40,
+        "road_name": "Dillingham Blvd"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [-157.8720, 21.3160],
+          [-157.8700, 21.3150],
+          [-157.8680, 21.3135]
+        ]
+      },
+      "properties": {
+        "detection_type": "cracking",
+        "severity": "medium",
+        "paser": 3,
+        "retro": 95,
+        "aadt": 11000,
+        "speed_limit": 45,
+        "road_name": "Kamehameha Hwy"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-157.8640, 21.3110]
+      },
+      "properties": {
+        "detection_type": "MOT",
+        "severity": "medium",
+        "paser": 5,
+        "retro": 150,
+        "aadt": 20000,
+        "speed_limit": 55,
+        "road_name": "H-1 On-Ramp"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-157.8560, 21.3035]
+      },
+      "properties": {
+        "detection_type": "sign",
+        "severity": "medium",
+        "paser": 6,
+        "retro": 160,
+        "aadt": 13000,
+        "speed_limit": 45,
+        "road_name": "Beretania St"
+      }
+    }
+  ]
+}
