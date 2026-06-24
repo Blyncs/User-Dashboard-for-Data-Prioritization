@@ -392,20 +392,68 @@
         9:'Vegetation Encroachment',     10:'MOT'
     };
 
-    /* ── Map detection type → rank ────────────────────────────────────── */
+    /* ── Scan ALL string property values for a rank match ────────────── */
     function detectionToRank(val) {
         if (!val) return null;
-        const d = String(val).toLowerCase().replace(/[_\-]/g, ' ');
-        if (d.includes('guardrail') || d.includes('end treatment') || d.includes('terminal')) return 1;
+        const d = String(val).toLowerCase().replace(/[_\-\/]/g, ' ');
+        if (d.includes('guardrail') || d.includes('end treatment') || d.includes('terminal')
+            || d.includes('w beam') || d.includes('thrie') || d.includes('rail')) return 1;
         if (d.includes('cable'))     return 2;
         if (d.includes('concrete') || (d.includes('barrier') && !d.includes('cable'))) return 3;
-        if (d.includes('pothole'))   return 4;
-        if (d.includes('paint') || d.includes('marking') || d.includes('line') || d.includes('retro')) return 5;
+        if (d.includes('pothole') || d.includes('pot hole')) return 4;
+        if (d.includes('paint') || d.includes('marking') || d.includes('pavement mark')
+            || d.includes('retroreflect') || d.includes('lane line') || d.includes('stripe')) return 5;
         if (d.includes('sign'))      return 6;
         if (d.includes('paser') || (d.includes('pavement') && !d.includes('marking') && !d.includes('age'))) return 7;
-        if (d.includes('crack') || d.includes('alligator') || d.includes('longitudinal')) return 8;
-        if (d.includes('veget') || d.includes('mow') || d.includes('tree') || d.includes('brush')) return 9;
-        if (d.includes('mot') || d.includes('work zone') || d.includes('traffic control')) return 10;
+        if (d.includes('crack') || d.includes('alligator') || d.includes('longitudinal')
+            || d.includes('transverse') || d.includes('fatigue')) return 8;
+        if (d.includes('veget') || d.includes('mow') || d.includes('tree')
+            || d.includes('brush') || d.includes('overgrow')) return 9;
+        if (d.includes('mot') || d.includes('work zone') || d.includes('traffic control')
+            || d.includes('maintenance of traffic')) return 10;
+        return null;
+    }
+
+    /* ── Extract best detection type from ALL string properties ────────── */
+    function extractDetectionType(properties) {
+        if (!properties) return null;
+
+        // 1. Try known field names first (exact match)
+        const knownKeys = [
+            'detection_type','DetectionType','detectionType',
+            'asset_type','AssetType','assetType',
+            'damage_type','DamageType','damageType',
+            'damage','Damage',
+            'category','Category',
+            'class','Class','classification','Classification',
+            'feature','Feature','feature_type','FeatureType',
+            'label','Label',
+            'type','Type','TYPE',
+            'detection','Detection',
+            'defect','Defect','defect_type','DefectType',
+            'description','Description',
+            'name','Name'
+        ];
+        for (const k of knownKeys) {
+            if (properties[k] != null) {
+                const rank = detectionToRank(String(properties[k]));
+                if (rank !== null) return { value: String(properties[k]), rank };
+            }
+        }
+
+        // 2. Fall back: scan ALL string values in any property
+        for (const [k, v] of Object.entries(properties)) {
+            if (typeof v === 'string' && v.length > 0 && v.length < 80) {
+                const rank = detectionToRank(v);
+                if (rank !== null) return { value: v, rank };
+            }
+        }
+
+        // 3. Return the raw value of any known key even if unmatched (for display)
+        for (const k of knownKeys) {
+            if (properties[k] != null) return { value: String(properties[k]), rank: null };
+        }
+
         return null;
     }
 
@@ -559,9 +607,8 @@
                     push(acc.paser,        ['paser','PASER','paser_rating','PASER_RATING']);
                     push(acc.retro,        ['retro','RETRO','retroreflectivity','RETROREFLECTIVITY','retro_score']);
 
-                    const dt = p.detection_type ?? p.DetectionType ?? p.asset_type
-                             ?? p.damage_type   ?? p.type          ?? p.TYPE;
-                    if (dt) assetTypes.add(String(dt));
+                    const detected = extractDetectionType(p);
+                    if (detected) assetTypes.add(detected.value);
                 });
 
                 // Collect all unique property keys from the first 5 features for debugging
@@ -573,10 +620,8 @@
                 // Count how many features have no matching detection type
                 let unmatchedCount = 0;
                 (geo.features || []).forEach(f => {
-                    const p = f.properties || {};
-                    const dt = p.detection_type ?? p.DetectionType ?? p.asset_type
-                             ?? p.damage_type   ?? p.type          ?? p.TYPE;
-                    if (!dt || detectionToRank(dt) === null) unmatchedCount++;
+                    const detected = extractDetectionType(f.properties || {});
+                    if (!detected || detected.rank === null) unmatchedCount++;
                 });
 
                 /* ── Helper: average an array ──────────────────────────── */
@@ -719,20 +764,16 @@
         geoLayer = L.geoJSON(geo, {
             /* Style lines / polygons */
             style: function(feature) {
-                const p  = feature.properties || {};
-                const dt = p.detection_type ?? p.DetectionType ?? p.asset_type
-                         ?? p.damage_type   ?? p.type          ?? p.TYPE;
-                const rank  = detectionToRank(dt) || 5;
-                const color = RANK_COLORS[rank];
+                const detected = extractDetectionType(feature.properties || {});
+                const rank  = detected?.rank ?? null;
+                const color = rank ? RANK_COLORS[rank] : '#94a3b8'; // grey = unrecognized
                 return { color, weight: 4, opacity: 0.9, fillColor: color, fillOpacity: 0.4 };
             },
             /* Style point features as circle markers */
             pointToLayer: function(feature, latlng) {
-                const p  = feature.properties || {};
-                const dt = p.detection_type ?? p.DetectionType ?? p.asset_type
-                         ?? p.damage_type   ?? p.type          ?? p.TYPE;
-                const rank  = detectionToRank(dt) || 5;
-                const color = RANK_COLORS[rank];
+                const detected = extractDetectionType(feature.properties || {});
+                const rank  = detected?.rank ?? null;
+                const color = rank ? RANK_COLORS[rank] : '#94a3b8';
                 return L.circleMarker(latlng, {
                     radius: 9, fillColor: color,
                     color: '#ffffff', weight: 2,
@@ -741,31 +782,39 @@
             },
             /* Attach popup to every feature */
             onEachFeature: function(feature, layer) {
-                const p  = feature.properties || {};
-                const dt = p.detection_type ?? p.DetectionType ?? p.asset_type
-                         ?? p.damage_type   ?? p.type          ?? p.TYPE ?? 'Unknown';
-                const rank  = detectionToRank(dt) || 5;
-                const color = RANK_COLORS[rank];
+                const p = feature.properties || {};
+                const detected = extractDetectionType(p);
+                const rank  = detected?.rank ?? null;
+                const dtLabel = detected?.value ?? 'Unrecognized';
+                const color = rank ? RANK_COLORS[rank] : '#94a3b8';
+                const rankLabel = rank ? RANK_NAMES[rank] : 'Unrecognized Type';
 
-                const asset  = currentAssets.find(a => a.rank === rank);
+                const asset  = rank ? currentAssets.find(a => a.rank === rank) : null;
                 const score  = asset ? asset.normalized.toFixed(1) : '—';
                 const urgLbl = asset ? urgency(asset.normalized).label : '—';
 
-                // Per-feature PASER / retro (fall back to file averages)
-                const featPaser = p.paser ?? p.PASER ?? filePaser;
+                const featPaser = p.paser ?? p.PASER ?? p.paser_rating ?? filePaser;
                 const featRetro = p.retro ?? p.RETRO ?? p.retroreflectivity ?? fileRetro;
 
+                // Build a summary of all raw properties for unmatched features
+                const extraRows = !rank
+                    ? Object.entries(p).slice(0, 6).map(([k,v]) =>
+                        `<tr><td style="color:#94a3b8;padding:2px 0;font-style:italic;">${k}</td>
+                             <td style="font-weight:500;text-align:right;color:#374151;">${v}</td></tr>`
+                      ).join('')
+                    : '';
+
                 layer.bindPopup(`
-                    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;min-width:210px;">
+                    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;min-width:220px;">
                         <div style="display:flex;align-items:center;gap:9px;margin-bottom:10px;">
                             <span style="background:${color};color:#fff;border-radius:50%;width:30px;height:30px;
                                   display:inline-flex;align-items:center;justify-content:center;
-                                  font-weight:700;font-size:15px;flex-shrink:0;">${rank}</span>
-                            <strong style="color:#1e3a5f;font-size:13px;">${RANK_NAMES[rank]}</strong>
+                                  font-weight:700;font-size:15px;flex-shrink:0;">${rank ?? '?'}</span>
+                            <strong style="color:#1e3a5f;font-size:13px;">${rankLabel}</strong>
                         </div>
                         <table style="width:100%;font-size:12px;border-collapse:collapse;">
-                            <tr><td style="color:#64748b;padding:3px 0;">Detection Type</td>
-                                <td style="font-weight:600;text-align:right;">${dt}</td></tr>
+                            <tr><td style="color:#64748b;padding:3px 0;">Detection Value</td>
+                                <td style="font-weight:600;text-align:right;">${dtLabel}</td></tr>
                             <tr><td style="color:#64748b;padding:3px 0;">Priority Score</td>
                                 <td style="font-weight:700;color:${color};text-align:right;">${score} / 100</td></tr>
                             <tr><td style="color:#64748b;padding:3px 0;">Urgency</td>
@@ -774,8 +823,9 @@
                                 <td style="font-weight:600;text-align:right;">${parseFloat(featPaser).toFixed(1)}</td></tr>
                             <tr><td style="color:#64748b;padding:3px 0;">Retroreflectivity</td>
                                 <td style="font-weight:600;text-align:right;">${Math.round(featRetro)} mcd</td></tr>
+                            ${extraRows ? `<tr><td colspan="2" style="padding-top:6px;color:#94a3b8;font-size:10px;font-style:italic;">Raw properties (unmatched):</td></tr>${extraRows}` : ''}
                         </table>
-                    </div>`, { maxWidth: 280 });
+                    </div>`, { maxWidth: 300 });
             }
         }).addTo(leafletMap);
 
