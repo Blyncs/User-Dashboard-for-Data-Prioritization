@@ -188,6 +188,16 @@
             margin-bottom: 18px; line-height: 1.5;
         }
 
+        /* ── Map color mode toggle ───────────────────────────── */
+        .map-toggle { display: flex; gap: 0; border-radius: 6px; overflow: hidden;
+                      border: 1px solid #d1d5db; }
+        .map-toggle button {
+            padding: 5px 12px; font-size: 11px; font-weight: 600; border: none;
+            background: #f8fafc; color: #64748b; cursor: pointer; transition: all 0.15s;
+        }
+        .map-toggle button.active { background: #1e3a5f; color: white; }
+        .map-toggle button:hover:not(.active) { background: #e2e8f0; }
+
         /* ── Feature-level breakdown table ───────────────────── */
         .feature-section { margin-bottom: 24px; display: none; }
         .feature-section.visible { display: block; }
@@ -367,7 +377,13 @@
     <div class="map-section" id="map-section">
         <div class="section-header">
             <h2>🗺️ Asset Priority Map</h2>
-            <span style="font-size:12px;color:#64748b;">Features color-coded by priority rank (1–10) — click any feature for details</span>
+            <div style="display:flex;align-items:center;gap:12px;">
+                <span style="font-size:11px;color:#64748b;">Color by:</span>
+                <div class="map-toggle">
+                    <button id="toggle-cat" class="active" onclick="setMapColorMode('category')">Category Rank</button>
+                    <button id="toggle-sev" onclick="setMapColorMode('severity')">Severity Level</button>
+                </div>
+            </div>
         </div>
         <div id="map"></div>
     </div>
@@ -438,10 +454,19 @@
     let geoLayer        = null;
     let legendControl   = null;
     let featureRankings = []; // array of scored+ranked feature objects
+    let mapColorMode    = 'category'; // 'category' | 'severity'
 
     // Values extracted from the uploaded file (defaults until file loaded)
     let filePaser = 5;
     let fileRetro = 150;
+
+    const SEV_COLORS = {
+        critical: '#dc2626',
+        high:     '#f97316',
+        medium:   '#eab308',
+        low:      '#22c55e',
+        null:     '#94a3b8'
+    };
 
     /* ── Rank color + name lookups (match CSS) ────────────────────────── */
     const RANK_COLORS = {
@@ -526,27 +551,45 @@
     function extractSeverity(p) {
         const sevKeys = ['severity','Severity','SEVERITY','damage_level','DamageLevel',
                          'condition','Condition','priority','Priority','status','Status',
-                         'urgency','Urgency','level','Level','grade','Grade'];
+                         'urgency','Urgency','level','Level','grade','Grade',
+                         'damage','Damage','rating','Rating','risk','Risk',
+                         'defect_severity','DefectSeverity','impact','Impact'];
+
+        const matchSevString = (v) => {
+            const s = String(v).toLowerCase().trim();
+            if (s.includes('critical') || s.includes('very high') || s.includes('severe'))  return 'critical';
+            if (s.includes('high')     || s === '2' || s.includes('major'))                  return 'high';
+            if (s.includes('med')      || s === '3' || s.includes('moderate') || s.includes('fair')) return 'medium';
+            if (s.includes('low')      || s === '4' || s === '5' || s.includes('minor') || s.includes('good')) return 'low';
+            // Numeric 0–100 or 0–10 damage score
+            const n = parseFloat(s);
+            if (!isNaN(n) && s === String(n)) { // pure number, not text containing a number
+                const norm = n > 10 ? n / 100 : n / 10;
+                if (norm >= 0.75) return 'critical';
+                if (norm >= 0.50) return 'high';
+                if (norm >= 0.25) return 'medium';
+                return 'low';
+            }
+            return null;
+        };
+
+        // 1. Try known field names first
         for (const k of sevKeys) {
             if (p[k] != null) {
-                const v = String(p[k]).toLowerCase().trim();
-                if (v.includes('critical') || v === '1' || v === 'very high') return 'critical';
-                if (v.includes('high')     || v === '2')                       return 'high';
-                if (v.includes('med')      || v === '3')                       return 'medium';
-                if (v.includes('low')      || v === '4' || v === '5')          return 'low';
-                // Numeric 0–100 or 0–10 damage score
-                const n = parseFloat(v);
-                if (!isNaN(n)) {
-                    const norm = n > 10 ? n / 100 : n / 10;
-                    if (norm >= 0.75) return 'critical';
-                    if (norm >= 0.50) return 'high';
-                    if (norm >= 0.25) return 'medium';
-                    return 'low';
-                }
-                return v; // return raw if unrecognized
+                const result = matchSevString(p[k]);
+                if (result) return result;
             }
         }
-        return null;
+
+        // 2. Scan ALL string property values for severity keywords
+        for (const [k, v] of Object.entries(p)) {
+            if (typeof v === 'string' && v.length > 0 && v.length < 60) {
+                const result = matchSevString(v);
+                if (result) return result;
+            }
+        }
+
+        return null; // will be derived from crit score in buildFeatureRankings
     }
 
     /* ── Convert severity label → 0–100 weight ──────────────────────── */
@@ -592,8 +635,17 @@
             const p        = f.properties || {};
             const detected = extractDetectionType(p);
             const rank     = detected?.rank ?? null;
-            const sev      = extractSeverity(p);
+            let   sev      = extractSeverity(p);
             const crit     = featureCriticalityScore(p);
+
+            // Always derive severity — fall back to criticality score bands
+            if (!sev || !['critical','high','medium','low'].includes(sev)) {
+                if (crit >= 75) sev = 'critical';
+                else if (crit >= 50) sev = 'high';
+                else if (crit >= 25) sev = 'medium';
+                else sev = 'low';
+            }
+
             return { idx, rank, catName: rank ? RANK_NAMES[rank] : 'Unrecognized',
                      dtLabel: detected?.value ?? 'Unknown', sev, crit, props: p };
         });
@@ -1004,6 +1056,27 @@
         reader.readAsText(file);
     }
 
+    /* ── Map color mode switch ────────────────────────────────────────── */
+    function setMapColorMode(mode) {
+        mapColorMode = mode;
+        document.getElementById('toggle-cat').classList.toggle('active', mode === 'category');
+        document.getElementById('toggle-sev').classList.toggle('active', mode === 'severity');
+        if (geoData) renderMap(geoData);
+    }
+
+    /* ── Get color for a feature based on current mode ───────────────── */
+    function featureColor(feature) {
+        const featureIdx = (geoData?.features || []).indexOf(feature);
+        const fr = featureRankings.find(r => r.idx === featureIdx);
+        if (mapColorMode === 'severity') {
+            return SEV_COLORS[fr?.sev] ?? '#94a3b8';
+        }
+        // category mode
+        const detected = extractDetectionType(feature.properties || {});
+        const rank = detected?.rank ?? null;
+        return rank ? RANK_COLORS[rank] : '#94a3b8';
+    }
+
     /* ── Render Map ───────────────────────────────────────────────────── */
     function renderMap(geo) {
         // Initialise Leaflet map once
@@ -1018,14 +1091,7 @@
             legendControl = L.control({ position: 'topright' });
             legendControl.onAdd = function() {
                 const div = L.DomUtil.create('div', 'map-legend');
-                let html = '<h4>Priority Rank</h4>';
-                for (let r = 1; r <= 10; r++) {
-                    html += `<div class="legend-item">
-                        <span class="legend-dot" style="background:${RANK_COLORS[r]};"></span>
-                        <span>${r}. ${RANK_NAMES[r]}</span>
-                    </div>`;
-                }
-                div.innerHTML = html;
+                div.id = 'map-legend-inner';
                 return div;
             };
             legendControl.addTo(leafletMap);
@@ -1034,20 +1100,39 @@
         // Remove previous GeoJSON layer
         if (geoLayer) { leafletMap.removeLayer(geoLayer); geoLayer = null; }
 
+        // Rebuild legend content to match current color mode
+        const legendEl = document.getElementById('map-legend-inner');
+        if (legendEl) {
+            if (mapColorMode === 'severity') {
+                legendEl.innerHTML = `<h4>Severity Level</h4>
+                    <div class="legend-item"><span class="legend-dot" style="background:#dc2626;"></span><span>Critical</span></div>
+                    <div class="legend-item"><span class="legend-dot" style="background:#f97316;"></span><span>High</span></div>
+                    <div class="legend-item"><span class="legend-dot" style="background:#eab308;"></span><span>Medium</span></div>
+                    <div class="legend-item"><span class="legend-dot" style="background:#22c55e;"></span><span>Low</span></div>
+                    <div class="legend-item"><span class="legend-dot" style="background:#94a3b8;"></span><span>Unrecognized</span></div>`;
+            } else {
+                let html = '<h4>Priority Rank</h4>';
+                for (let r = 1; r <= 10; r++) {
+                    html += `<div class="legend-item">
+                        <span class="legend-dot" style="background:${RANK_COLORS[r]};"></span>
+                        <span>${r}. ${RANK_NAMES[r]}</span>
+                    </div>`;
+                }
+                html += `<div class="legend-item"><span class="legend-dot" style="background:#94a3b8;"></span><span>Unrecognized</span></div>`;
+                legendEl.innerHTML = html;
+            }
+        }
+
         // Add new GeoJSON layer
         geoLayer = L.geoJSON(geo, {
             /* Style lines / polygons */
             style: function(feature) {
-                const detected = extractDetectionType(feature.properties || {});
-                const rank  = detected?.rank ?? null;
-                const color = rank ? RANK_COLORS[rank] : '#94a3b8'; // grey = unrecognized
+                const color = featureColor(feature);
                 return { color, weight: 4, opacity: 0.9, fillColor: color, fillOpacity: 0.4 };
             },
             /* Style point features as circle markers */
             pointToLayer: function(feature, latlng) {
-                const detected = extractDetectionType(feature.properties || {});
-                const rank  = detected?.rank ?? null;
-                const color = rank ? RANK_COLORS[rank] : '#94a3b8';
+                const color = featureColor(feature);
                 return L.circleMarker(latlng, {
                     radius: 9, fillColor: color,
                     color: '#ffffff', weight: 2,
@@ -1079,6 +1164,7 @@
                 const sevLabel = fr?.sev
                     ? fr.sev.charAt(0).toUpperCase() + fr.sev.slice(1)
                     : '—';
+                const sevColor = SEV_COLORS[fr?.sev] ?? '#94a3b8';
                 const critScore = fr ? fr.critNorm : '—';
 
                 // Build a summary of all raw properties for unmatched features
@@ -1104,7 +1190,12 @@
                             <tr><td style="color:#64748b;padding:3px 0;">Detection Value</td>
                                 <td style="font-weight:600;text-align:right;">${dtLabel}</td></tr>
                             <tr><td style="color:#64748b;padding:3px 0;">Severity</td>
-                                <td style="font-weight:600;text-align:right;">${sevLabel}</td></tr>
+                                <td style="font-weight:600;text-align:right;">
+                                    <span style="display:inline-flex;align-items:center;gap:4px;justify-content:flex-end;">
+                                        <span style="width:8px;height:8px;border-radius:50%;background:${sevColor};display:inline-block;"></span>
+                                        ${sevLabel}
+                                    </span>
+                                </td></tr>
                             <tr><td style="color:#64748b;padding:3px 0;">Criticality Score</td>
                                 <td style="font-weight:700;color:${color};text-align:right;">${critScore} / 100</td></tr>
                             <tr><td style="color:#64748b;padding:3px 0;">Category Score</td>
