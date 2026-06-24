@@ -188,6 +188,75 @@
             margin-bottom: 18px; line-height: 1.5;
         }
 
+        /* ── Active Sources List ─────────────────────────────── */
+        .source-item {
+            display: flex; align-items: stretch; background: #f8fafc;
+            border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 6px;
+            overflow: hidden; transition: opacity 0.2s;
+        }
+        .source-item.source-hidden { opacity: 0.45; }
+        .source-color-bar { width: 5px; flex-shrink: 0; }
+        .source-item-body { flex: 1; padding: 8px 10px; min-width: 0; }
+        .source-item-name {
+            font-size: 12px; font-weight: 700; color: #1e3a5f;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .source-item-meta { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 3px; align-items: center; }
+        .source-item-meta span { font-size: 10px; color: #64748b; }
+        .source-type-tag {
+            display: inline-block; background: #e0f2fe; color: #0369a1;
+            border-radius: 3px; padding: 1px 5px; font-size: 10px; font-weight: 700;
+        }
+        .source-asset-tags { margin-top: 5px; }
+        .source-item-actions {
+            display: flex; flex-direction: column; border-left: 1px solid #e2e8f0; flex-shrink: 0;
+        }
+        .source-btn {
+            background: none; border: none; cursor: pointer; padding: 6px 9px;
+            font-size: 13px; color: #94a3b8; flex: 1; transition: background 0.15s; line-height: 1;
+        }
+        .source-btn:hover { background: #f1f5f9; color: #374151; }
+        .source-btn-remove:hover { background: #fee2e2 !important; color: #dc2626 !important; }
+
+        /* ── WFS Connection Panel ─────────────────────────────── */
+        .wfs-connect-row { display: flex; gap: 8px; margin-bottom: 10px; }
+        .wfs-url-input {
+            flex: 1; padding: 7px 10px; border: 1px solid #d1d5db;
+            border-radius: 6px; font-size: 11px; color: #1a1a2e; background: #f9fafb;
+        }
+        .wfs-url-input:focus { outline: none; border-color: #2d6a9f; background: white; }
+        .wfs-connect-btn {
+            background: #1e3a5f; color: white; border: none; padding: 7px 13px;
+            border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 700;
+            white-space: nowrap; transition: background 0.2s;
+        }
+        .wfs-connect-btn:hover { background: #2d6a9f; }
+        .wfs-status { font-size: 11px; margin-bottom: 8px; line-height: 1.6; }
+        .wfs-loading { color: #f59e0b; }
+        .wfs-layer-list {
+            max-height: 170px; overflow-y: auto; margin-bottom: 8px;
+            border: 1px solid #e2e8f0; border-radius: 6px; background: white;
+        }
+        .wfs-layer-item {
+            display: flex; align-items: center; gap: 8px; padding: 7px 10px;
+            border-bottom: 1px solid #f1f5f9; transition: background 0.15s;
+        }
+        .wfs-layer-item:last-child { border-bottom: none; }
+        .wfs-layer-item:hover { background: #f0f9ff; }
+        .wfs-layer-item.wfs-dragging { opacity: 0.45; background: #e0f2fe; }
+        .wfs-drag-handle { color: #94a3b8; font-size: 15px; cursor: grab; flex-shrink: 0; user-select: none; }
+        .wfs-target-zone {
+            border: 2px dashed #93c5fd; border-radius: 8px; padding: 14px;
+            text-align: center; background: #eff6ff; color: #1d4ed8;
+            font-size: 12px; font-weight: 600; transition: all 0.2s; cursor: default;
+        }
+        .wfs-target-zone.drag-over { border-color: #2d6a9f; background: #dbeafe; box-shadow: 0 0 0 3px rgba(45,106,159,0.2); }
+        .cors-note { font-size: 10px; color: #94a3b8; margin-top: 8px; line-height: 1.5; }
+        .cors-note code { background: #f1f5f9; padding: 1px 4px; border-radius: 3px; font-family: monospace; }
+
+        /* ── Drag-over style for file upload zone ─────────────── */
+        .file-upload-area.drag-over { border-color: #2d6a9f !important; background: #dbeafe !important; }
+
         /* ── Map color mode toggle ───────────────────────────── */
         .map-toggle { display: flex; gap: 0; border-radius: 6px; overflow: hidden;
                       border: 1px solid #d1d5db; }
@@ -236,36 +305,56 @@
 
     <div class="sidebar-body">
 
-        <!-- 📁 Blyncsy GeoJSON Upload — PASER & Retro come from here -->
+        <!-- 📁 Data Sources: File Upload + WFS Connection -->
         <div class="input-section">
-            <div class="section-title">📁 Blyncsy GeoJSON File</div>
-            <div class="file-upload-area" onclick="document.getElementById('geojson-file').click()">
+            <div class="section-title">📁 Data Sources</div>
+
+            <!-- File upload zone (accepts multiple files + drag-drop) -->
+            <div class="file-upload-area" id="file-drop-zone"
+                 onclick="document.getElementById('geojson-file').click()">
                 <span class="file-upload-icon">🗺️</span>
-                <span class="file-upload-text">Click to Upload GeoJSON</span>
-                <span class="file-upload-sub">PASER &amp; Retroreflectivity read from file</span>
-                <input type="file" id="geojson-file" accept=".geojson,.json" onchange="handleFileLoad()">
+                <span class="file-upload-text">Click or drag GeoJSON files here</span>
+                <span class="file-upload-sub">Select one or more .geojson / .json files</span>
+                <input type="file" id="geojson-file" accept=".geojson,.json" multiple
+                       onchange="handleFileLoad()">
             </div>
-            <div class="file-info-box" id="file-info-box">
-                <div class="file-info-name">✅ <span id="file-name-display">—</span></div>
-                <div class="file-info-row">
-                    <span>Features loaded</span>
-                    <span class="file-info-val" id="fi-features">—</span>
+
+            <!-- Active Sources list (shown once at least one source is loaded) -->
+            <div id="active-sources-section" style="display:none; margin-top:12px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                    <span style="font-size:11px;font-weight:700;color:#374151;letter-spacing:0.5px;">ACTIVE SOURCES</span>
+                    <span class="feat-count-badge" id="source-count-badge">0 sources</span>
                 </div>
-                <div class="file-info-row">
-                    <span>Avg PASER Rating</span>
-                    <span class="file-info-val" id="fi-paser">—</span>
+                <div id="active-sources-list"></div>
+            </div>
+
+            <!-- WFS Connection (optional) -->
+            <div style="margin-top:16px;padding-top:14px;border-top:2px dashed #e2e8f0;">
+                <div class="section-title" style="margin-bottom:10px;">🌐 WFS Connection (Optional)</div>
+                <div class="wfs-connect-row">
+                    <input type="text" id="wfs-url" class="wfs-url-input"
+                           placeholder="https://…/wfs  or  …/ows">
+                    <button class="wfs-connect-btn" onclick="connectWFS()">Connect</button>
                 </div>
-                <div class="file-info-row">
-                    <span>Avg Retroreflectivity</span>
-                    <span class="file-info-val" id="fi-retro">—</span>
+                <div id="wfs-status" class="wfs-status" style="display:none;"></div>
+
+                <!-- Layer list + drop target — revealed after successful GetCapabilities -->
+                <div id="wfs-panel" style="display:none;">
+                    <div style="font-size:11px;font-weight:700;color:#374151;margin-bottom:6px;letter-spacing:0.5px;">
+                        AVAILABLE LAYERS — drag to add ↓
+                    </div>
+                    <div id="wfs-layer-list" class="wfs-layer-list"></div>
+                    <div id="wfs-target-zone" class="wfs-target-zone"
+                         ondragover="event.preventDefault();this.classList.add('drag-over')"
+                         ondragleave="this.classList.remove('drag-over')"
+                         ondrop="handleWFSLayerDrop(event)">
+                        🗂️ Drop a layer here to add it to the dashboard
+                    </div>
                 </div>
-                <div style="margin-top:8px;font-size:11px;color:#64748b;font-weight:600;">Detected Asset Types:</div>
-                <div id="fi-asset-tags" style="margin-top:4px;"></div>
-                <div id="fi-unmatched-warn" style="display:none;margin-top:8px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;padding:8px;font-size:11px;color:#9a3412;">
-                    ⚠️ <strong id="fi-unmatched-count">0</strong> features have no matching detection type — showing as green (Rank 5 default).<br>
-                    <span style="color:#64748b;margin-top:4px;display:block;">Property keys found in your file:</span>
-                    <div id="fi-prop-keys" style="margin-top:4px;"></div>
-                </div>
+                <p class="cors-note">
+                    ⚠️ The WFS server must allow browser CORS requests and support
+                    <code>outputFormat=application/json</code>.
+                </p>
             </div>
         </div>
 
@@ -341,8 +430,9 @@
 
     <div class="info-note">
         ℹ️ Priority scores are <strong>normalized (0–100)</strong> relative to the highest-scoring asset.
-        <strong>PASER Rating</strong> and <strong>Retroreflectivity Score</strong> are extracted automatically from the uploaded GeoJSON file (defaults used until a file is loaded).
-        Upload a file to activate the map view with color-coded asset locations.
+        <strong>PASER Rating</strong> and <strong>Retroreflectivity Score</strong> are extracted automatically from loaded files.
+        Upload <strong>one or more GeoJSON files</strong> — or connect a <strong>WFS endpoint</strong> — to activate the map view with color-coded asset locations.
+        Files can be removed individually without affecting the other loaded sources.
     </div>
 
     <!-- Derived Metric Cards -->
@@ -415,6 +505,7 @@
                         <th>#</th>
                         <th>Within-Cat Rank</th>
                         <th>Category</th>
+                        <th>Source</th>
                         <th>Detection Value</th>
                         <th>Severity</th>
                         <th>Criticality Score</th>
@@ -449,14 +540,28 @@
 
 <script>
     let currentAssets   = [];
-    let geoData         = null;
+    let geoData         = null;   // merged FeatureCollection — rebuilt whenever sources change
     let leafletMap      = null;
     let geoLayer        = null;
     let legendControl   = null;
-    let featureRankings = []; // array of scored+ranked feature objects
+    let featureRankings = [];
     let mapColorMode    = 'category'; // 'category' | 'severity'
 
-    // Values extracted from the uploaded file (defaults until file loaded)
+    // ── Multi-source state ──────────────────────────────────────────────
+    // Each source: { id, name, type, geo, color, visible,
+    //                paser, retro, featureCount, assetTypes,
+    //                unmatchedCount, propKeys, acc }
+    let dataSources  = [];
+    let nextSourceId = 1;
+    const SOURCE_PALETTE = [
+        '#3b82f6','#f59e0b','#10b981','#ef4444',
+        '#8b5cf6','#06b6d4','#f97316','#84cc16','#ec4899','#6366f1'
+    ];
+
+    // WFS state  (populated after a successful GetCapabilities call)
+    let wfsLayers = []; // [{ name, title }, …]
+
+    // Global PASER & Retro — averaged across all visible sources
     let filePaser = 5;
     let fileRetro = 150;
 
@@ -678,16 +783,14 @@
 
         featureRankings = items;
 
-        // Populate category filter dropdown
+        // Populate category filter dropdown — reset first so stale options are cleared
         const sel = document.getElementById('feat-filter-cat');
-        const existing = new Set([...sel.options].map(o => o.value));
+        sel.innerHTML = '<option value="">All Categories</option>';
         const cats = [...new Set(items.filter(i => i.rank).map(i => i.catName))];
         cats.forEach(c => {
-            if (!existing.has(c)) {
-                const opt = document.createElement('option');
-                opt.value = c; opt.text = c;
-                sel.appendChild(opt);
-            }
+            const opt = document.createElement('option');
+            opt.value = c; opt.text = c;
+            sel.appendChild(opt);
         });
 
         renderFeatureTable();
@@ -715,7 +818,7 @@
         tbody.innerHTML = '';
 
         if (!rows.length) {
-            tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:20px;font-style:italic;">No features match the current filters.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:20px;font-style:italic;">No features match the current filters.</td></tr>`;
             return;
         }
 
@@ -731,6 +834,7 @@
             tr.style.cursor = 'pointer';
             tr.title = 'Click to highlight on map';
             tr.onclick = () => highlightFeature(item.idx);
+            const srcName = item.props.__sourceName ?? '';
             tr.innerHTML = `
                 <td style="color:#94a3b8;font-size:12px;">${display_i + 1}</td>
                 <td>
@@ -743,6 +847,7 @@
                         <span style="font-weight:600;font-size:12px;color:#1e3a5f;">${item.catName}</span>
                     </span>
                 </td>
+                <td style="font-size:11px;color:#64748b;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${srcName}">${srcName}</td>
                 <td style="font-size:12px;color:#374151;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${item.dtLabel}">${item.dtLabel}</td>
                 <td>
                     <span style="display:inline-flex;align-items:center;">
@@ -885,175 +990,383 @@
         });
     }
 
-    /* ── GeoJSON Upload ───────────────────────────────────────────────── */
-    function handleFileLoad() {
-        const file = document.getElementById('geojson-file').files[0];
-        if (!file) return;
+    /* ══════════════════════════════════════════════════════════════════
+     *  MULTI-SOURCE DATA MANAGEMENT
+     * ══════════════════════════════════════════════════════════════════ */
 
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            try {
-                const geo = JSON.parse(e.target.result);
-                geoData = geo;
+    /** Merge all *visible* sources into a single FeatureCollection.
+     *  Each feature gets __sourceName / __sourceId injected into properties
+     *  so popups and CSV exports can identify which file a feature came from. */
+    function getMergedGeo() {
+        const allFeatures = dataSources
+            .filter(s => s.visible)
+            .flatMap(s => (s.geo.features || []).map(f => ({
+                type: 'Feature',
+                geometry: f.geometry,
+                properties: { ...f.properties, __sourceName: s.name, __sourceId: s.id }
+            })));
+        return { type: 'FeatureCollection', features: allFeatures };
+    }
 
-                /* ── Accumulate all numeric fields across every feature ── */
-                const acc = {
-                    aadt:           [], aadtt:    [], seg_len:  [],
-                    k_factor:       [], d_factor: [], speed:    [],
-                    pavement_age:   [], radius:   [],
-                    paser:          [], retro:    []
-                };
-                const assetTypes = new Set();
+    /** Parse a raw GeoJSON object, extract metadata, and return a source record. */
+    function processGeoSource(name, type, geo) {
+        const acc = {
+            aadt:[], aadtt:[], seg_len:[], k_factor:[], d_factor:[],
+            speed:[], pavement_age:[], radius:[], paser:[], retro:[]
+        };
+        const assetTypes    = new Set();
+        const allPropKeys   = new Set();
+        let   unmatchedCount = 0;
 
-                (geo.features || []).forEach(f => {
-                    const p = f.properties || {};
+        (geo.features || []).forEach(f => {
+            const p = f.properties || {};
+            Object.keys(p).forEach(k => allPropKeys.add(k));
 
-                    const grab = (keys) => {
-                        for (const k of keys) {
-                            if (p[k] != null && !isNaN(parseFloat(p[k])))
-                                return parseFloat(p[k]);
-                        }
-                        return null;
-                    };
-
-                    const push = (bucket, keys) => {
-                        const v = grab(keys);
-                        if (v !== null) bucket.push(v);
-                    };
-
-                    push(acc.aadt,         ['aadt','AADT','avg_aadt','AVG_AADT']);
-                    push(acc.aadtt,        ['aadtt','AADTT','truck_aadt','TRUCK_AADT']);
-                    push(acc.seg_len,      ['length','LENGTH','seg_len','SEG_LEN','segment_length','miles']);
-                    push(acc.k_factor,     ['k_factor','K_FACTOR','k','K','peak_hour_factor']);
-                    push(acc.d_factor,     ['d_factor','D_FACTOR','d','D','directional_factor']);
-                    push(acc.speed,        ['speed','SPEED','speed_limit','SPEED_LIMIT','posted_speed']);
-                    push(acc.pavement_age, ['age','AGE','pave_age','PAVE_AGE','pavement_age','PAVEMENT_AGE']);
-                    push(acc.radius,       ['radius','RADIUS','turning_radius','TURNING_RADIUS','curve_radius']);
-                    push(acc.paser,        ['paser','PASER','paser_rating','PASER_RATING']);
-                    push(acc.retro,        ['retro','RETRO','retroreflectivity','RETROREFLECTIVITY','retro_score']);
-
-                    const detected = extractDetectionType(p);
-                    if (detected) assetTypes.add(detected.value);
-                });
-
-                // Collect all unique property keys from the first 5 features for debugging
-                const allPropKeys = new Set();
-                (geo.features || []).slice(0, 5).forEach(f => {
-                    Object.keys(f.properties || {}).forEach(k => allPropKeys.add(k));
-                });
-
-                // Count how many features have no matching detection type
-                let unmatchedCount = 0;
-                (geo.features || []).forEach(f => {
-                    const detected = extractDetectionType(f.properties || {});
-                    if (!detected || detected.rank === null) unmatchedCount++;
-                });
-
-                /* ── Helper: average an array ──────────────────────────── */
-                const avg = (arr) => arr.length
-                    ? arr.reduce((a, b) => a + b, 0) / arr.length
-                    : null;
-
-                /* ── Auto-populate sidebar number inputs ───────────────── */
-                const setInput = (id, badgeId, values, decimals = 0) => {
-                    const val = avg(values);
-                    const el  = document.getElementById(id);
-                    const badge = document.getElementById(badgeId);
-                    if (val !== null) {
-                        el.value = parseFloat(val.toFixed(decimals));
-                        el.classList.add('from-file');
-                        badge.innerHTML = '<span class="auto-badge">↑ from file</span>';
-                    } else {
-                        el.classList.remove('from-file');
-                        badge.innerHTML = '';
-                    }
-                };
-
-                /* ── Auto-populate sidebar range sliders ───────────────── */
-                const setSlider = (id, labelId, badgeId, values, decimals = 2) => {
-                    const val = avg(values);
-                    const el  = document.getElementById(id);
-                    const badge = document.getElementById(badgeId);
-                    if (val !== null) {
-                        // Clamp to slider min/max
-                        const clamped = Math.min(Math.max(val, parseFloat(el.min)), parseFloat(el.max));
-                        el.value = clamped.toFixed(decimals);
-                        document.getElementById(labelId).innerText = clamped.toFixed(decimals);
-                        badge.innerHTML = '<span class="auto-badge">↑ from file</span>';
-                    } else {
-                        badge.innerHTML = '';
-                    }
-                };
-
-                setInput('aadt',          'badge-aadt',          acc.aadt,         0);
-                setInput('aadtt',         'badge-aadtt',         acc.aadtt,        0);
-                setInput('seg-len',       'badge-seg-len',       acc.seg_len,      2);
-                setInput('speed-limit',   'badge-speed-limit',   acc.speed,        0);
-                setInput('pavement-age',  'badge-pavement-age',  acc.pavement_age, 1);
-                setInput('turning-radius','badge-turning-radius', acc.radius,      0);
-                setSlider('k-factor', 'k-val', 'badge-k-factor', acc.k_factor, 2);
-                setSlider('d-factor', 'd-val', 'badge-d-factor', acc.d_factor, 2);
-
-                /* ── PASER & Retro (file-only values) ──────────────────── */
-                filePaser = avg(acc.paser) !== null
-                    ? +avg(acc.paser).toFixed(1) : 5;
-                fileRetro = avg(acc.retro) !== null
-                    ? Math.round(avg(acc.retro)) : 150;
-
-                /* ── Populate file info box ─────────────────────────────── */
-                document.getElementById('file-name-display').innerText = file.name;
-                document.getElementById('fi-features').innerText = (geo.features || []).length;
-
-                document.getElementById('fi-paser').innerHTML = acc.paser.length
-                    ? `${filePaser} <span class="from-file-badge">from file</span>`
-                    : `5.0 <span class="from-file-badge">default</span>`;
-
-                document.getElementById('fi-retro').innerHTML = acc.retro.length
-                    ? `${fileRetro} mcd <span class="from-file-badge">from file</span>`
-                    : `150 mcd <span class="from-file-badge">default</span>`;
-
-                const tagsEl = document.getElementById('fi-asset-tags');
-                tagsEl.innerHTML = '';
-                if (assetTypes.size) {
-                    assetTypes.forEach(t => {
-                        const s = document.createElement('span');
-                        s.className = 'file-info-tag';
-                        s.innerText = t;
-                        tagsEl.appendChild(s);
-                    });
-                } else {
-                    tagsEl.innerHTML = '<span style="font-size:11px;color:#94a3b8;font-style:italic;">No type tags detected</span>';
+            const grab = (keys) => {
+                for (const k of keys) {
+                    if (p[k] != null && !isNaN(parseFloat(p[k]))) return parseFloat(p[k]);
                 }
+                return null;
+            };
+            const push = (bucket, keys) => { const v = grab(keys); if (v !== null) bucket.push(v); };
 
-                // Show unmatched warning with property key list
-                const warnEl = document.getElementById('fi-unmatched-warn');
-                if (unmatchedCount > 0) {
-                    document.getElementById('fi-unmatched-count').innerText = unmatchedCount;
-                    const keysEl = document.getElementById('fi-prop-keys');
-                    keysEl.innerHTML = '';
-                    allPropKeys.forEach(k => {
-                        const s = document.createElement('span');
-                        s.style.cssText = 'display:inline-block;background:#f1f5f9;color:#1e3a5f;border-radius:3px;padding:1px 5px;font-size:10px;font-weight:600;margin:2px 2px 0 0;font-family:monospace;';
-                        s.innerText = k;
-                        keysEl.appendChild(s);
-                    });
-                    warnEl.style.display = 'block';
-                } else {
-                    warnEl.style.display = 'none';
-                }
+            push(acc.aadt,         ['aadt','AADT','avg_aadt','AVG_AADT']);
+            push(acc.aadtt,        ['aadtt','AADTT','truck_aadt','TRUCK_AADT']);
+            push(acc.seg_len,      ['length','LENGTH','seg_len','SEG_LEN','segment_length','miles']);
+            push(acc.k_factor,     ['k_factor','K_FACTOR','k','K','peak_hour_factor']);
+            push(acc.d_factor,     ['d_factor','D_FACTOR','d','D','directional_factor']);
+            push(acc.speed,        ['speed','SPEED','speed_limit','SPEED_LIMIT','posted_speed']);
+            push(acc.pavement_age, ['age','AGE','pave_age','PAVE_AGE','pavement_age','PAVEMENT_AGE']);
+            push(acc.radius,       ['radius','RADIUS','turning_radius','TURNING_RADIUS','curve_radius']);
+            push(acc.paser,        ['paser','PASER','paser_rating','PASER_RATING']);
+            push(acc.retro,        ['retro','RETRO','retroreflectivity','RETROREFLECTIVITY','retro_score']);
 
-                document.getElementById('file-info-box').classList.add('visible');
-                document.getElementById('map-section').classList.add('visible');
-                calculate();
-                buildFeatureRankings(geo);
-                renderMap(geo);
+            const detected = extractDetectionType(p);
+            if (detected) assetTypes.add(detected.value);
+            if (!detected || detected.rank === null) unmatchedCount++;
+        });
 
-            } catch(err) {
-                console.warn('GeoJSON parse error:', err);
-                alert('Could not parse the uploaded file. Please check it is valid GeoJSON.');
+        const avg = (arr) => arr.length ? arr.reduce((a,b) => a+b, 0) / arr.length : null;
+        const color = SOURCE_PALETTE[(nextSourceId - 1) % SOURCE_PALETTE.length];
+
+        return {
+            id:            `src-${nextSourceId++}`,
+            name, type, geo, color,
+            visible:       true,
+            paser:         avg(acc.paser) !== null ? +avg(acc.paser).toFixed(1)    : null,
+            retro:         avg(acc.retro) !== null ? Math.round(avg(acc.retro))    : null,
+            featureCount:  (geo.features || []).length,
+            assetTypes, unmatchedCount, propKeys: allPropKeys,
+            acc   // kept so updateSidebarInputsFromSources() can re-average on changes
+        };
+    }
+
+    /** Add a source to dataSources and trigger a full dashboard rebuild. */
+    function addSource(name, type, geo) {
+        const src = processGeoSource(name, type, geo);
+        dataSources.push(src);
+        renderSourceList();
+        updateSidebarInputsFromSources();
+        rebuildFromSources();
+        return src;
+    }
+
+    /** Remove a source by id and rebuild. */
+    function removeSource(id) {
+        dataSources = dataSources.filter(s => s.id !== id);
+        renderSourceList();
+        updateSidebarInputsFromSources();
+        rebuildFromSources();
+    }
+
+    /** Toggle a source's visibility and rebuild. */
+    function toggleSourceVisibility(id) {
+        const src = dataSources.find(s => s.id === id);
+        if (src) {
+            src.visible = !src.visible;
+            renderSourceList();
+            updateSidebarInputsFromSources();
+            rebuildFromSources();
+        }
+    }
+
+    /** Merge all visible sources, re-score features, and re-render everything. */
+    function rebuildFromSources() {
+        if (!dataSources.some(s => s.visible)) {
+            geoData = null;
+            featureRankings = [];
+            if (geoLayer) { leafletMap?.removeLayer(geoLayer); geoLayer = null; }
+            document.getElementById('map-section').classList.remove('visible');
+            document.getElementById('feature-section').classList.remove('visible');
+            document.getElementById('feature-table-body').innerHTML = '';
+            calculate();
+            return;
+        }
+
+        geoData = getMergedGeo();
+
+        // Recompute global PASER & Retro from all visible sources
+        const vis = dataSources.filter(s => s.visible);
+        const paserVals = vis.map(s => s.paser).filter(v => v !== null);
+        const retroVals = vis.map(s => s.retro).filter(v => v !== null);
+        filePaser = paserVals.length ? paserVals.reduce((a,b) => a+b, 0) / paserVals.length : 5;
+        fileRetro = retroVals.length ? retroVals.reduce((a,b) => a+b, 0) / retroVals.length : 150;
+
+        document.getElementById('map-section').classList.add('visible');
+        calculate();
+        buildFeatureRankings(geoData);
+        renderMap(geoData);
+    }
+
+    /** Average numeric fields across all visible sources and auto-populate sidebar inputs. */
+    function updateSidebarInputsFromSources() {
+        const combined = {
+            aadt:[], aadtt:[], seg_len:[], k_factor:[],
+            d_factor:[], speed:[], pavement_age:[], radius:[]
+        };
+        dataSources.filter(s => s.visible && s.acc).forEach(src => {
+            const a = src.acc;
+            combined.aadt         = combined.aadt.concat(a.aadt);
+            combined.aadtt        = combined.aadtt.concat(a.aadtt);
+            combined.seg_len      = combined.seg_len.concat(a.seg_len);
+            combined.k_factor     = combined.k_factor.concat(a.k_factor);
+            combined.d_factor     = combined.d_factor.concat(a.d_factor);
+            combined.speed        = combined.speed.concat(a.speed);
+            combined.pavement_age = combined.pavement_age.concat(a.pavement_age);
+            combined.radius       = combined.radius.concat(a.radius);
+        });
+
+        const avg = (arr) => arr.length ? arr.reduce((a,b) => a+b, 0) / arr.length : null;
+
+        const setInput = (id, badgeId, values, decimals = 0) => {
+            const val   = avg(values);
+            const el    = document.getElementById(id);
+            const badge = document.getElementById(badgeId);
+            if (val !== null) {
+                el.value = parseFloat(val.toFixed(decimals));
+                el.classList.add('from-file');
+                badge.innerHTML = '<span class="auto-badge">↑ from file</span>';
+            } else {
+                el.classList.remove('from-file');
+                badge.innerHTML = '';
             }
         };
-        reader.readAsText(file);
+
+        const setSlider = (id, labelId, badgeId, values, decimals = 2) => {
+            const val   = avg(values);
+            const el    = document.getElementById(id);
+            const badge = document.getElementById(badgeId);
+            if (val !== null) {
+                const clamped = Math.min(Math.max(val, parseFloat(el.min)), parseFloat(el.max));
+                el.value = clamped.toFixed(decimals);
+                document.getElementById(labelId).innerText = clamped.toFixed(decimals);
+                badge.innerHTML = '<span class="auto-badge">↑ from file</span>';
+            } else {
+                badge.innerHTML = '';
+            }
+        };
+
+        setInput('aadt',           'badge-aadt',           combined.aadt,         0);
+        setInput('aadtt',          'badge-aadtt',          combined.aadtt,        0);
+        setInput('seg-len',        'badge-seg-len',        combined.seg_len,      2);
+        setInput('speed-limit',    'badge-speed-limit',    combined.speed,        0);
+        setInput('pavement-age',   'badge-pavement-age',   combined.pavement_age, 1);
+        setInput('turning-radius', 'badge-turning-radius', combined.radius,       0);
+        setSlider('k-factor', 'k-val', 'badge-k-factor',  combined.k_factor, 2);
+        setSlider('d-factor', 'd-val', 'badge-d-factor',  combined.d_factor, 2);
+    }
+
+    /** Render the active sources panel in the sidebar. */
+    function renderSourceList() {
+        const section = document.getElementById('active-sources-section');
+        const list    = document.getElementById('active-sources-list');
+        const badge   = document.getElementById('source-count-badge');
+
+        if (!dataSources.length) {
+            section.style.display = 'none';
+            return;
+        }
+
+        section.style.display = 'block';
+        const n = dataSources.length;
+        badge.innerText = `${n} source${n !== 1 ? 's' : ''}`;
+        list.innerHTML  = '';
+
+        dataSources.forEach(src => {
+            const div = document.createElement('div');
+            div.className = 'source-item' + (src.visible ? '' : ' source-hidden');
+            const typeTag = src.type === 'wfs' ? '🌐 WFS' : '📄 File';
+
+            div.innerHTML = `
+                <div class="source-color-bar" style="background:${src.color};"></div>
+                <div class="source-item-body">
+                    <div class="source-item-name" title="${src.name}">${src.name}</div>
+                    <div class="source-item-meta">
+                        <span class="source-type-tag">${typeTag}</span>
+                        <span>${src.featureCount} features</span>
+                        ${src.paser !== null ? `<span>PASER ${src.paser}</span>` : ''}
+                        ${src.unmatchedCount ? `<span style="color:#f59e0b;">⚠ ${src.unmatchedCount} unmatched</span>` : ''}
+                    </div>
+                    ${src.assetTypes.size
+                        ? `<div class="source-asset-tags">${
+                              [...src.assetTypes].slice(0, 4)
+                                  .map(t => `<span class="file-info-tag">${t}</span>`).join('')
+                          }</div>`
+                        : ''}
+                </div>
+                <div class="source-item-actions">
+                    <button class="source-btn"
+                            title="${src.visible ? 'Hide layer' : 'Show layer'}"
+                            onclick="toggleSourceVisibility('${src.id}')"
+                    >${src.visible ? '👁' : '🚫'}</button>
+                    <button class="source-btn source-btn-remove"
+                            title="Remove source"
+                            onclick="removeSource('${src.id}')">✕</button>
+                </div>`;
+            list.appendChild(div);
+        });
+    }
+
+    /* ══════════════════════════════════════════════════════════════════
+     *  WFS CONNECTION
+     * ══════════════════════════════════════════════════════════════════ */
+
+    async function connectWFS() {
+        const rawUrl   = document.getElementById('wfs-url').value.trim();
+        if (!rawUrl) { alert('Please enter a WFS base URL.'); return; }
+
+        const statusEl = document.getElementById('wfs-status');
+        const panel    = document.getElementById('wfs-panel');
+        statusEl.style.display = 'block';
+        statusEl.innerHTML     = '<span class="wfs-loading">⏳ Fetching capabilities…</span>';
+        panel.style.display    = 'none';
+
+        // Strip any existing service/request params so we build cleanly
+        const baseUrl = rawUrl.split('?')[0];
+        const capUrl  = `${baseUrl}?service=WFS&request=GetCapabilities`;
+
+        try {
+            const resp = await fetch(capUrl);
+            if (!resp.ok) throw new Error(`HTTP ${resp.status} — ${resp.statusText}`);
+            const text   = await resp.text();
+            const layers = parseWFSCapabilities(text);
+            if (!layers.length) throw new Error('No feature types found in the capabilities response.');
+
+            wfsLayers = layers;
+            statusEl.innerHTML = `<span style="color:#15803d;">✅ Connected — ${layers.length} layer${layers.length !== 1 ? 's' : ''} available</span>`;
+            renderWFSLayers(layers);
+            panel.style.display = 'block';
+        } catch (err) {
+            console.error('WFS connect error:', err);
+            statusEl.innerHTML =
+                `<span style="color:#dc2626;">❌ ${err.message}</span>
+                 <br><span style="font-size:10px;color:#94a3b8;">
+                     Verify the URL is a valid WFS endpoint, test it in your browser, and confirm the server allows CORS.
+                 </span>`;
+        }
+    }
+
+    function parseWFSCapabilities(xmlText) {
+        const doc    = new DOMParser().parseFromString(xmlText, 'application/xml');
+        const layers = [];
+        // Handles both WFS 1.x and 2.0 namespaces
+        doc.querySelectorAll('FeatureTypeList FeatureType, FeatureType').forEach(ft => {
+            const nameEl  = ft.querySelector('Name,name');
+            const titleEl = ft.querySelector('Title,title');
+            if (nameEl) {
+                layers.push({
+                    name:  nameEl.textContent.trim(),
+                    title: titleEl ? titleEl.textContent.trim() : nameEl.textContent.trim()
+                });
+            }
+        });
+        return layers;
+    }
+
+    function renderWFSLayers(layers) {
+        const list = document.getElementById('wfs-layer-list');
+        list.innerHTML = '';
+        layers.forEach(lyr => {
+            const div = document.createElement('div');
+            div.className = 'wfs-layer-item';
+            div.draggable = true;
+            div.dataset.layerName  = lyr.name;
+            div.dataset.layerTitle = lyr.title;
+            div.innerHTML = `
+                <span class="wfs-drag-handle">⠿</span>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-weight:600;font-size:12px;color:#1e3a5f;
+                                overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+                         title="${lyr.title}">${lyr.title}</div>
+                    <div style="font-size:10px;color:#94a3b8;font-family:monospace;
+                                overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${lyr.name}</div>
+                </div>
+                <button class="source-btn" title="Add to dashboard"
+                        onclick="fetchWFSLayer('${lyr.name.replace(/'/g,"\\'")}','${lyr.title.replace(/'/g,"\\'")}')">＋</button>`;
+            div.addEventListener('dragstart', e => {
+                e.dataTransfer.setData('text/plain', JSON.stringify({ name: lyr.name, title: lyr.title }));
+                div.classList.add('wfs-dragging');
+            });
+            div.addEventListener('dragend', () => div.classList.remove('wfs-dragging'));
+            list.appendChild(div);
+        });
+    }
+
+    function handleWFSLayerDrop(event) {
+        event.preventDefault();
+        document.getElementById('wfs-target-zone').classList.remove('drag-over');
+        try {
+            const data = JSON.parse(event.dataTransfer.getData('text/plain'));
+            if (data.name) fetchWFSLayer(data.name, data.title);
+        } catch (e) { console.warn('Drop parse error:', e); }
+    }
+
+    async function fetchWFSLayer(typeName, title) {
+        const rawUrl = document.getElementById('wfs-url').value.trim();
+        if (!rawUrl) return;
+
+        const statusEl = document.getElementById('wfs-status');
+        statusEl.style.display = 'block';
+        statusEl.innerHTML     = `<span class="wfs-loading">⏳ Loading "${title}"…</span>`;
+
+        const baseUrl = rawUrl.split('?')[0];
+        // Try WFS 2.0.0 with GeoJSON output first; many servers also accept 1.1.0
+        const url = `${baseUrl}?service=WFS&version=2.0.0&request=GetFeature` +
+                    `&typeName=${encodeURIComponent(typeName)}&outputFormat=application%2Fjson`;
+        try {
+            const resp = await fetch(url);
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const geo = await resp.json();
+            if (!geo || !geo.features) throw new Error('Response is not a valid GeoJSON FeatureCollection.');
+            addSource(title, 'wfs', geo);
+            statusEl.innerHTML =
+                `<span style="color:#15803d;">✅ Loaded "${title}" — ${(geo.features||[]).length} features</span>`;
+        } catch (err) {
+            console.error('WFS fetch error:', err);
+            statusEl.innerHTML =
+                `<span style="color:#dc2626;">❌ Failed to load "${title}": ${err.message}</span>`;
+        }
+    }
+
+    /* ── GeoJSON File Upload (multi-file) ────────────────────────────── */
+    function handleFileLoad() {
+        const files = Array.from(document.getElementById('geojson-file').files);
+        if (!files.length) return;
+        files.forEach(file => {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const geo = JSON.parse(e.target.result);
+                    addSource(file.name, 'file', geo);
+                } catch (err) {
+                    console.warn('GeoJSON parse error:', err);
+                    alert(`Could not parse "${file.name}". Please check it is valid GeoJSON.`);
+                }
+            };
+            reader.readAsText(file);
+        });
+        // Reset so the same file(s) can be re-uploaded if needed
+        document.getElementById('geojson-file').value = '';
     }
 
     /* ── Map color mode switch ────────────────────────────────────────── */
@@ -1154,6 +1467,7 @@
 
                 const featPaser = p.paser ?? p.PASER ?? p.paser_rating ?? filePaser;
                 const featRetro = p.retro ?? p.RETRO ?? p.retroreflectivity ?? fileRetro;
+                const sourceName = p.__sourceName ?? null;
 
                 // Within-category rank from featureRankings
                 const featureIdx = (geoData.features || []).indexOf(feature);
@@ -1167,12 +1481,15 @@
                 const sevColor = SEV_COLORS[fr?.sev] ?? '#94a3b8';
                 const critScore = fr ? fr.critNorm : '—';
 
-                // Build a summary of all raw properties for unmatched features
+                // Build a summary of raw properties for unmatched features (skip internal __ keys)
                 const extraRows = !rank
-                    ? Object.entries(p).slice(0, 6).map(([k,v]) =>
-                        `<tr><td style="color:#94a3b8;padding:2px 0;font-style:italic;">${k}</td>
-                             <td style="font-weight:500;text-align:right;color:#374151;">${v}</td></tr>`
-                      ).join('')
+                    ? Object.entries(p)
+                        .filter(([k]) => !k.startsWith('__'))
+                        .slice(0, 6)
+                        .map(([k,v]) =>
+                          `<tr><td style="color:#94a3b8;padding:2px 0;font-style:italic;">${k}</td>
+                               <td style="font-weight:500;text-align:right;color:#374151;">${v}</td></tr>`
+                        ).join('')
                     : '';
 
                 layer.bindPopup(`
@@ -1187,6 +1504,9 @@
                             </div>
                         </div>
                         <table style="width:100%;font-size:12px;border-collapse:collapse;">
+                            ${sourceName ? `<tr><td style="color:#64748b;padding:3px 0;">Source</td>
+                                <td style="font-weight:600;text-align:right;max-width:130px;overflow:hidden;
+                                    text-overflow:ellipsis;white-space:nowrap;" title="${sourceName}">${sourceName}</td></tr>` : ''}
                             <tr><td style="color:#64748b;padding:3px 0;">Detection Value</td>
                                 <td style="font-weight:600;text-align:right;">${dtLabel}</td></tr>
                             <tr><td style="color:#64748b;padding:3px 0;">Severity</td>
@@ -1242,11 +1562,12 @@
     /* ── CSV Export — Feature Rankings ───────────────────────────────── */
     function downloadFeatureCSV() {
         if (!featureRankings.length) return;
-        const headers = ['Category Rank','Category Name','Within-Cat Rank','Detection Value','Severity','Criticality Score (0-100)','Urgency'];
+        const headers = ['Source','Category Rank','Category Name','Within-Cat Rank','Detection Value','Severity','Criticality Score (0-100)','Urgency'];
         const rows = featureRankings.map(item => {
             const u = urgency(item.critNorm);
             const catCount = featureRankings.filter(r => r.rank === item.rank).length;
             return [
+                `"${item.props.__sourceName ?? ''}"`,
                 item.rank ?? '?',
                 `"${item.catName}"`,
                 `${item.withinRank} of ${catCount}`,
@@ -1265,6 +1586,41 @@
     }
 
     /* ── Init ─────────────────────────────────────────────────────────── */
+
+    // Enable drag-and-drop directly onto the file upload zone
+    (function initFileDragDrop() {
+        const zone = document.getElementById('file-drop-zone');
+        zone.addEventListener('dragover', e => {
+            e.preventDefault();
+            zone.classList.add('drag-over');
+        });
+        zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+        zone.addEventListener('drop', e => {
+            e.preventDefault();
+            zone.classList.remove('drag-over');
+            const files = Array.from(e.dataTransfer.files)
+                .filter(f => /\.(geo)?json$/i.test(f.name));
+            if (!files.length) return;
+            try {
+                const dt = new DataTransfer();
+                files.forEach(f => dt.items.add(f));
+                document.getElementById('geojson-file').files = dt.files;
+                handleFileLoad();
+            } catch(err) {
+                // Fallback for browsers that don't support DataTransfer constructor
+                files.forEach(file => {
+                    const reader = new FileReader();
+                    reader.onload = ev => {
+                        try {
+                            addSource(file.name, 'file', JSON.parse(ev.target.result));
+                        } catch(pe) { alert(`Could not parse "${file.name}".`); }
+                    };
+                    reader.readAsText(file);
+                });
+            }
+        });
+    })();
+
     calculate();
 </script>
 </body>
