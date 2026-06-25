@@ -178,6 +178,20 @@
         .badge-medium   { background: #fefce8; color: #854d0e; }
         .badge-low      { background: #f0fdf4; color: #166534; }
 
+        /* ── Timeframe badges ────────────────────────────────── */
+        .badge-tf-quick  { background: #dcfce7; color: #15803d; padding: 3px 9px; border-radius: 12px;
+                           font-size: 11px; font-weight: 700; white-space: nowrap; }
+        .badge-tf-medium { background: #fef9c3; color: #854d0e; padding: 3px 9px; border-radius: 12px;
+                           font-size: 11px; font-weight: 700; white-space: nowrap; }
+        .badge-tf-long   { background: #ffe4e6; color: #9f1239; padding: 3px 9px; border-radius: 12px;
+                           font-size: 11px; font-weight: 700; white-space: nowrap; }
+
+        /* ── Cost-effectiveness mini bar ─────────────────────── */
+        .cost-eff-wrap  { display: flex; flex-direction: column; gap: 3px; }
+        .cost-eff-label { font-size: 11px; font-weight: 700; }
+        .cost-eff-track { height: 5px; border-radius: 3px; background: #e2e8f0; min-width: 56px; }
+        .cost-eff-fill  { height: 100%; border-radius: 3px; }
+
         .formula-text {
             font-family: 'Courier New', monospace; font-size: 11px;
             color: #64748b; background: #f8fafc; padding: 2px 6px; border-radius: 4px;
@@ -429,10 +443,12 @@
     </div>
 
     <div class="info-note">
-        ℹ️ Priority scores are <strong>normalized (0–100)</strong> relative to the highest-scoring asset.
-        <strong>PASER Rating</strong> and <strong>Retroreflectivity Score</strong> are extracted automatically from loaded files.
-        Upload <strong>one or more GeoJSON files</strong> — or connect a <strong>WFS endpoint</strong> — to activate the map view with color-coded asset locations.
-        Files can be removed individually without affecting the other loaded sources.
+        ℹ️ Priority scores are a <strong>composite of three factors (0–100)</strong>:
+        <strong>50% Traffic Severity</strong> (VMT, speed, AADT exposure) +
+        <strong>30% Cost-Effectiveness</strong> (safety impact per dollar — cheap quick-wins rank up) +
+        <strong>20% Timeframe Urgency</strong> (⚡ quick fixes boosted; 🏗 capital projects reduced).
+        <strong>PASER</strong> and <strong>Retroreflectivity</strong> are extracted from loaded files.
+        Upload one or more GeoJSON files — or connect a WFS endpoint — to activate the map.
     </div>
 
     <!-- Derived Metric Cards -->
@@ -528,7 +544,9 @@
                 <tr>
                     <th>Rank</th>
                     <th>Asset / Detection Type</th>
-                    <th>Primary Risk Driver</th>
+                    <th>Est. Repair Cost</th>
+                    <th>Timeframe</th>
+                    <th>Cost-Effectiveness</th>
                     <th>Priority Score</th>
                     <th>Urgency</th>
                 </tr>
@@ -586,6 +604,50 @@
         7:'PASER / Pavement',            8:'Cracking',
         9:'Vegetation Encroachment',     10:'MOT'
     };
+
+    /* ── Per-asset cost & urgency data ───────────────────────────────── *
+     *  costNorm   1–10 (1 = cheapest, 10 = most expensive project)
+     *  safetyImpact 1–10 (1 = lowest, 10 = highest life-safety impact)
+     *  timeframe  'quick' | 'medium' | 'long'
+     *  costEfficiency = (safetyImpact / costNorm) × 10 → normalized 0–100
+     *    max across all 10 = Potholes: (8/1)×10 = 80  ← MAX_COST_EFF
+     * ──────────────────────────────────────────────────────────────────*/
+    const ASSET_COST_DATA = {
+        1:  { costRange:'$1,500 – $12,000',       avgCost:   5000, costNorm: 4, timeframe:'medium',
+              safetyImpact:10,
+              note:'End terminal & W-beam / thrie-beam section replacement' },
+        2:  { costRange:'$2,000 – $15,000',        avgCost:   8000, costNorm: 5, timeframe:'medium',
+              safetyImpact: 9,
+              note:'Cable tensioning, anchor posts, wire rope replacement' },
+        3:  { costRange:'$5,000 – $30,000',        avgCost:  15000, costNorm: 7, timeframe:'long',
+              safetyImpact: 8,
+              note:'Jersey barrier panel replacement, concrete repair' },
+        4:  { costRange:'$50 – $500 / pothole',    avgCost:    200, costNorm: 1, timeframe:'quick',
+              safetyImpact: 8,
+              note:'Cold / hot-mix patching, rapid-set repair' },
+        5:  { costRange:'$5,000 – $15,000 / lane-mi', avgCost: 8000, costNorm: 3, timeframe:'quick',
+              safetyImpact: 7,
+              note:'Thermoplastic or paint restriping' },
+        6:  { costRange:'$200 – $2,000 / sign',    avgCost:    800, costNorm: 2, timeframe:'quick',
+              safetyImpact: 7,
+              note:'Sign panel, post & hardware replacement' },
+        7:  { costRange:'$150K – $600K / lane-mi', avgCost: 400000, costNorm:10, timeframe:'long',
+              safetyImpact: 6,
+              note:'Mill & overlay, structural resurfacing, reconstruction' },
+        8:  { costRange:'$1,000 – $8,000',         avgCost:   3000, costNorm: 2, timeframe:'quick',
+              safetyImpact: 5,
+              note:'Crack sealing, routing & surface treatment' },
+        9:  { costRange:'$500 – $3,000',           avgCost:   1500, costNorm: 1, timeframe:'quick',
+              safetyImpact: 4,
+              note:'Mowing, trimming, chemical / herbicide treatment' },
+        10: { costRange:'$5,000 – $100,000+',      avgCost:  25000, costNorm: 6, timeframe:'long',
+              safetyImpact: 7,
+              note:'Traffic control plan, barriers & personnel setup' }
+    };
+    // Pre-computed max cost-effectiveness raw value (Potholes: (8/1)×10 = 80)
+    const MAX_COST_EFF   = 80;
+    // Timeframe → urgency score 0–100 (feeds 20% of composite)
+    const TIMEFRAME_SCORE = { quick: 100, medium: 60, long: 25 };
 
     /* ── Scan ALL string property values for a rank match ────────────── */
     function detectionToRank(val) {
@@ -926,19 +988,38 @@
         document.getElementById('metric-sf').innerText    = fmt(sf);
         document.getElementById('metric-gr').innerText    = gr.toFixed(4);
 
-        /* 10 Asset Priority Scores */
-        const assets = [
-            { rank:1,  name:"End Treatments &amp; Guardrails", risk:"Impact Lethality",             formula:"VMT × GR × Speed",          score: vmt * gr * speed },
-            { rank:2,  name:"Cable Barriers",                   risk:"Head-on Crossovers",           formula:"AADT × Speed × (1 − D)",    score: aadt * speed * (1 - d) },
-            { rank:3,  name:"Concrete Barriers",                risk:"Mass Displacement",            formula:"AADTT × Speed",              score: aadtt * speed },
-            { rank:4,  name:"Potholes",                         risk:"Immediate Vehicle Damage",     formula:"V_peak × AADTT",             score: vpeak * aadtt },
-            { rank:5,  name:"Paintline Visibility",             risk:"Lane Departure",               formula:"VMT / Retroreflectivity",    score: retro > 0 ? vmt / retro : 0 },
-            { rank:6,  name:"Signs (Regulatory &amp; Warning)", risk:"Driver Disorientation",        formula:"AADT × GR × Speed",          score: aadt * gr * speed },
-            { rank:7,  name:"PASER (Pavement Rating)",          risk:"Long-Term Asset Devaluation",  formula:"(VMT × AADTT) / PASER",      score: paser > 0 ? (vmt * aadtt) / paser : 0 },
-            { rank:8,  name:"Cracking",                         risk:"Water Infiltration / Subbase", formula:"AADTT × Pavement Age",       score: aadtt * age },
-            { rank:9,  name:"Vegetation Encroachment",          risk:"Sight Distance Obstruction",   formula:"AADT × GR",                  score: aadt * gr },
-            { rank:10, name:"MOT (Maintenance of Traffic)",     risk:"Work Zone Safety &amp; Congestion", formula:"V_peak × Speed",        score: vpeak * speed }
+        /* ── 10 Asset Priority Scores — Composite Formula ─────────────────
+         *  50 % Traffic Severity  (existing VMT / speed / AADT-based formulas)
+         *  30 % Cost-Effectiveness  (safety impact per dollar — quick cheap fixes rank up)
+         *  20 % Timeframe Urgency  (quick-fix assets boosted; long capital projects reduced)
+         * ─────────────────────────────────────────────────────────────────── */
+        const rawAssets = [
+            { rank:1,  name:"End Treatments &amp; Guardrails", risk:"Impact Lethality",                  formula:"VMT × GR × Speed",            rawScore: vmt * gr * speed },
+            { rank:2,  name:"Cable Barriers",                   risk:"Head-on Crossovers",               formula:"AADT × Speed × (1 − D)",      rawScore: aadt * speed * (1 - d) },
+            { rank:3,  name:"Concrete Barriers",                risk:"Mass Displacement",                formula:"AADTT × Speed",                rawScore: aadtt * speed },
+            { rank:4,  name:"Potholes",                         risk:"Immediate Vehicle Damage",         formula:"V_peak × AADTT",               rawScore: vpeak * aadtt },
+            { rank:5,  name:"Paintline Visibility",             risk:"Lane Departure",                   formula:"VMT / Retroreflectivity",      rawScore: retro > 0 ? vmt / retro : 0 },
+            { rank:6,  name:"Signs (Regulatory &amp; Warning)", risk:"Driver Disorientation",            formula:"AADT × GR × Speed",            rawScore: aadt * gr * speed },
+            { rank:7,  name:"PASER (Pavement Rating)",          risk:"Long-Term Asset Devaluation",      formula:"(VMT × AADTT) / PASER",        rawScore: paser > 0 ? (vmt * aadtt) / paser : 0 },
+            { rank:8,  name:"Cracking",                         risk:"Water Infiltration / Subbase",     formula:"AADTT × Pavement Age",         rawScore: aadtt * age },
+            { rank:9,  name:"Vegetation Encroachment",          risk:"Sight Distance Obstruction",       formula:"AADT × GR",                    rawScore: aadt * gr },
+            { rank:10, name:"MOT (Maintenance of Traffic)",     risk:"Work Zone Safety &amp; Congestion", formula:"V_peak × Speed",              rawScore: vpeak * speed }
         ];
+
+        // Normalise raw traffic scores to 0–100
+        const maxRaw = Math.max(...rawAssets.map(a => a.rawScore), 1);
+
+        const assets = rawAssets.map(a => {
+            const trafficNorm = (a.rawScore / maxRaw) * 100;
+            const cd          = ASSET_COST_DATA[a.rank];
+            const costEffRaw  = (cd.safetyImpact / cd.costNorm) * 10;
+            const costEffNorm = Math.min((costEffRaw / MAX_COST_EFF) * 100, 100);
+            const tfScore     = TIMEFRAME_SCORE[cd.timeframe];
+
+            // Composite: 50% traffic severity + 30% cost-effectiveness + 20% timeframe urgency
+            const score = trafficNorm * 0.50 + costEffNorm * 0.30 + tfScore * 0.20;
+            return { ...a, trafficNorm, costEffNorm, tfScore, score };
+        });
 
         const maxScore = Math.max(...assets.map(a => a.score), 1);
         assets.forEach(a => { a.normalized = (a.score / maxScore) * 100; });
@@ -965,18 +1046,50 @@
         return '#22c55e';
     }
 
+    /* ── Timeframe badge helper ───────────────────────────────────────── */
+    function timeframeBadge(tf) {
+        if (tf === 'quick')  return { label:'⚡ Quick Fix',  cls:'badge-tf-quick'  };
+        if (tf === 'medium') return { label:'📅 Weeks',      cls:'badge-tf-medium' };
+        return                      { label:'🏗 Long-Term',  cls:'badge-tf-long'   };
+    }
+
+    /* ── Cost-effectiveness rating helper ────────────────────────────── */
+    function costEffLabel(norm) {
+        if (norm >= 65) return { label:'High',   color:'#15803d' };
+        if (norm >= 35) return { label:'Medium', color:'#92400e' };
+        return                 { label:'Low',    color:'#9f1239' };
+    }
+
     /* ── Render Table ─────────────────────────────────────────────────── */
     function renderTable(assets) {
         const tbody = document.getElementById('table-body');
         tbody.innerHTML = '';
         assets.forEach(a => {
-            const u = urgency(a.normalized);
-            const c = barColor(a.normalized);
+            const u  = urgency(a.normalized);
+            const c  = barColor(a.normalized);
+            const cd = ASSET_COST_DATA[a.rank];
+            const tf = timeframeBadge(cd.timeframe);
+            const ce = costEffLabel(a.costEffNorm);
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td><span class="rank-badge rank-${a.rank}">${a.rank}</span></td>
-                <td><span class="asset-name">${a.name}</span></td>
-                <td style="color:#64748b;font-size:12px;">${a.risk}</td>
+                <td>
+                    <span class="asset-name">${a.name}</span>
+                    <div style="font-size:10px;color:#94a3b8;margin-top:2px;">${a.risk}</div>
+                </td>
+                <td>
+                    <span style="font-size:12px;font-weight:600;color:#1e3a5f;">${cd.costRange}</span>
+                    <div style="font-size:10px;color:#94a3b8;margin-top:2px;max-width:170px;">${cd.note}</div>
+                </td>
+                <td><span class="${tf.cls}">${tf.label}</span></td>
+                <td>
+                    <div class="cost-eff-wrap">
+                        <span class="cost-eff-label" style="color:${ce.color};">${ce.label}</span>
+                        <div class="cost-eff-track">
+                            <div class="cost-eff-fill" style="width:${a.costEffNorm.toFixed(0)}%;background:${ce.color};"></div>
+                        </div>
+                    </div>
+                </td>
                 <td>
                     <div class="score-bar-container">
                         <div class="score-bar">
@@ -1545,11 +1658,32 @@
     /* ── CSV Export — Category Table ─────────────────────────────────── */
     function downloadCSV() {
         if (!currentAssets.length) return;
-        const headers = ['Rank','Asset / Detection Type','Primary Risk Driver','Formula','Normalized Score (0-100)','Urgency'];
+        const headers = [
+            'Rank','Asset / Detection Type','Primary Risk Driver','Formula',
+            'Traffic Severity Score (0-100)','Cost-Effectiveness Score (0-100)',
+            'Timeframe Urgency Score (0-100)','Composite Score (0-100)','Urgency',
+            'Est. Repair Cost','Timeframe','Avg Cost (USD)','Cost Note'
+        ];
         const rows = currentAssets.map(a => {
-            const u = urgency(a.normalized);
-            return [a.rank, `"${a.name.replace(/&amp;/g,'&')}"`, `"${a.risk}"`, `"${a.formula}"`,
-                    a.normalized.toFixed(2), u.label].join(',');
+            const u  = urgency(a.normalized);
+            const cd = ASSET_COST_DATA[a.rank];
+            const tf = timeframeBadge(cd.timeframe);
+            const ce = costEffLabel(a.costEffNorm);
+            return [
+                a.rank,
+                `"${a.name.replace(/&amp;/g,'&')}"`,
+                `"${a.risk}"`,
+                `"${a.formula}"`,
+                a.trafficNorm.toFixed(2),
+                a.costEffNorm.toFixed(2),
+                a.tfScore,
+                a.normalized.toFixed(2),
+                u.label,
+                `"${cd.costRange}"`,
+                tf.label.replace(/[⚡📅🏗]/g,'').trim(),
+                cd.avgCost,
+                `"${cd.note}"`
+            ].join(',');
         });
         const csv  = [headers.join(','), ...rows].join('\n');
         const blob = new Blob([csv], { type: 'text/csv' });
